@@ -53,8 +53,8 @@ __mockAE.undoGroups()                           // what Ctrl+Z would undo
 
 ### In After Effects
 
-**Locked-down machine (no admin, no Node):** install the signed ZXP that CI builds. See
-[`docs/INSTALL.md`](docs/INSTALL.md). It's a manual copy into your user extensions folder, with no `regedit`.
+**Locked-down machine (no admin, no Node):** download the signed ZXP that CI builds and install it with the
+aescripts ZXP/UXP Installer, or copy it in by hand. See [`docs/INSTALL.md`](docs/INSTALL.md). No `regedit` needed.
 
 **Development machine (hot reload):**
 
