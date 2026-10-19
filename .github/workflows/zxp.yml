@@ -1,9 +1,11 @@
 name: ZXP
-# Builds a self-signed ZXP on Windows (the signing tool has no Linux build). Download it from the run's
-# artifacts; tagged pushes (v0.1.0, …) also attach it to a GitHub release. See docs/INSTALL.md.
+# Optional: builds a ZXP signed with a throwaway certificate on Windows (the signing tool has no Linux build).
+# The usual route is to sign CI's `expression-suite-panel` artifact with your own certificate (docs/INSTALL.md),
+# so this only runs when started by hand or on a version tag.
 on:
-  push:
   workflow_dispatch:
+  push:
+    tags: ["v*"]
 
 permissions:
   contents: write

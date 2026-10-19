@@ -1,47 +1,62 @@
-# Installing Expression Suite without admin rights
+# Installing Expression Suite
 
-You don't need Node, `regedit` or an installer. The ZXP is signed (self-signed), so After Effects loads it without
-`PlayerDebugMode`. It goes into your **user** extensions folder, which needs no admin rights.
+You need no Node, no clone of the repo and no admin rights: just one zip from GitHub, `ZXPSignCmd.exe` and the
+ZXP/UXP Installer. CI builds the panel folder, and you sign it with your own certificate.
 
-## 1. Get the ZXP
+## 1. Download the built panel
 
-On GitHub, open **Actions › ZXP**, pick the latest run for the branch you want, and download the
-`expression-suite-zxp` artifact. It's a `.zip` that contains `com.expressionsuite.cep.zxp`.
-(Tagged versions also attach the `.zxp` to a release under **Releases**.)
+1. On GitHub, open **Actions › CI** and click the latest green run for the branch you want.
+2. Scroll to **Artifacts** at the bottom and click **expression-suite-panel**. This downloads
+   `expression-suite-panel.zip` (you need to be signed in to GitHub).
+3. Right-click the zip, choose **Extract All…**, and extract to `C:\Users\epiper\Downloads\expression-suite-panel`.
 
-## 2a. Install with the ZXP/UXP Installer (recommended)
+Check the result: opening `C:\Users\epiper\Downloads\expression-suite-panel` should show `CSXS`, `ide`, `jsx`, `assets`
+and `icons` directly inside. If Windows put them one folder deeper (`expression-suite-panel\expression-suite-panel\…`),
+move them up a level, because ZXPSignCmd needs `CSXS` at the top of the folder.
 
-1. Close After Effects.
-2. Unzip the artifact and drag `com.expressionsuite.cep.zxp` onto the
-   [aescripts ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) window (or use its File › Open).
-3. Start After Effects and open **Window › Extensions › Expression IDE**.
+## 2. Sign it in Command Prompt
 
-To update, install the new ZXP the same way; the installer replaces the old version. To remove it, use the installer's
-list of installed extensions.
+Open **Command Prompt** and paste these one at a time. Use your own password in place of `MyPassword123`, and leave
+`&`, `^` and spaces out of it because cmd treats them specially.
 
-## 2b. Or copy it in by hand
+```
+cd C:\Users\epiper\Downloads
+```
 
-If the installer isn't available, you can do what it does yourself. A `.zxp` is a zip file.
+**Certificate (first time only).** You can reuse the `expressionlab-cert.p12` you already have, since a certificate
+can sign any extension. To keep them separate, make a new one:
+```
+ZXPSignCmd.exe -selfSignedCert GB NA ExpressionSuite ExpressionSuite MyPassword123 expressionsuite-cert.p12
+```
 
-1. Close After Effects.
-2. Copy `com.expressionsuite.cep.zxp`, rename the copy to `com.expressionsuite.cep.zip`, and extract it.
-3. Move the extracted folder (it holds `CSXS`, `META-INF`, `ide`, `jsx`, …) into the folder below and name it
-   `com.expressionsuite.cep`:
-   - **Windows:** `%APPDATA%\Adobe\CEP\extensions\` (paste that into the Explorer address bar; create
-     `CEP\extensions` if it doesn't exist).
-   - **macOS:** `~/Library/Application Support/Adobe/CEP/extensions/` (Finder › Go › Go to Folder…).
+**Sign the panel into a .zxp:**
+```
+ZXPSignCmd.exe -sign expression-suite-panel ExpressionSuite-0.1.0.zxp expressionsuite-cert.p12 MyPassword123 -tsa http://timestamp.digicert.com
+```
 
-   You should end up with `…\extensions\com.expressionsuite.cep\CSXS\manifest.xml`.
-4. Start After Effects and open **Window › Extensions › Expression IDE**.
+**Check it worked (optional):**
+```
+ZXPSignCmd.exe -verify ExpressionSuite-0.1.0.zxp
+```
 
-## Updating a hand-copied install
+## 3. Install
 
-Close AE, delete the `com.expressionsuite.cep` folder, and extract the new ZXP in its place. Don't extract over the old
-folder: leftover files from the old version break the signature check.
+1. Drag `ExpressionSuite-0.1.0.zxp` into the ZXP/UXP Installer.
+2. Restart After Effects (2025 or later).
+3. Open **Window › Extensions › Expression IDE**.
 
-## If the panel doesn't appear
+## If something goes wrong
 
-- Check that `CSXS\manifest.xml` sits directly inside `com.expressionsuite.cep` (no extra folder level from extracting).
-- The ZXP needs After Effects 2025 (25.0) or later.
-- If your machine's policy blocks CEP extensions entirely, there's no way around it without IT. Ask them to allow
-  this one extension.
+- **`'ZXPSignCmd.exe' is not recognized`:** the file may have another name, such as `ZXPSignCmd-64bit.exe`. Run
+  `dir *.exe` to see the real name.
+- **The sign step fails at the timestamp:** run it again without `-tsa http://timestamp.digicert.com` on the end.
+- **The sign step complains about the manifest:** `CSXS` is nested one folder too deep (see step 1).
+- **"Output file already exists":** delete the old `.zxp` first.
+- **The panel doesn't appear in Window › Extensions:** check the installer listed it as installed for After Effects.
+  The panel needs AE 2025 (25.0) or later.
+
+## Updating
+
+Download the new artifact, extract it the same way, and run only the **Sign** command, with the same `.p12` and
+password and a new file name (`ExpressionSuite-0.2.0.zxp`). Keep the `.p12` and password safe: the same certificate
+lets updates install over the old version.

@@ -16,6 +16,13 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # The unsigned panel folder, ready for ZXPSignCmd (docs/INSTALL.md).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expression-suite-panel
+          path: dist/cep
+          if-no-files-found: error
+          retention-days: 30
 
   e2e:
     runs-on: ubuntu-latest
