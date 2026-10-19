@@ -1,0 +1,61 @@
+import { expect, test, type Page } from "@playwright/test";
+
+const POSITION = "100:13:ADBE Transform Group/ADBE Position";
+const mod = process.platform === "darwin" ? "Meta" : "Control";
+
+const row = (page: Page, key: string) => page.locator(`.row[data-key="${key}"]`);
+
+async function typeInEditor(page: Page, text: string) {
+  await page.locator(".monaco-editor .view-lines").click();
+  await page.keyboard.press(`${mod}+A`);
+  await page.keyboard.press("Delete");
+  await page.keyboard.type(text);
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/ide/index.html");
+  await expect(page.getByText("COMP: Main_Title")).toBeVisible();
+});
+
+test("selected layer shows its scriptable properties with badges", async ({ page }) => {
+  await expect(row(page, POSITION)).toContainText("{ }");
+  await expect(row(page, "100:13:ADBE Transform Group/ADBE Rotate Z")).toContainText("⚠");
+  await expect(row(page, "100:13:ADBE Transform Group/ADBE Opacity")).toHaveClass(/disabled/);
+  // The empty Effects group on Logo is never offered.
+  await page.evaluate(() => window.__mockAE!.selectLayers([12]));
+  await expect(row(page, "100:12:ADBE Mask Parade")).toBeVisible();
+  await expect(row(page, "100:12:ADBE Effect Parade")).toHaveCount(0);
+});
+
+test("timeline selection reaches the tree within 0.5 s", async ({ page }) => {
+  await page.evaluate(() => window.__mockAE!.selectLayers([11]));
+  await expect(row(page, "100:11:ADBE Effect Parade/ADBE Slider Control")).toBeVisible({ timeout: 500 });
+});
+
+test("edit Position, Ctrl+S applies in one undo step", async ({ page }) => {
+  await row(page, POSITION).click();
+  await expect(page.getByRole("tab", { name: /Title_Text › Position/ })).toBeVisible();
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("wiggle(");
+  await typeInEditor(page, "[100, 200]");
+  await expect(page.locator(".tab-close.dirty")).toBeVisible();
+  await page.keyboard.press(`${mod}+S`);
+  await expect(page.getByTestId("status-message")).toHaveText("Applied: Title_Text › Position");
+  await expect(page.locator(".tab-close.dirty")).toHaveCount(0);
+  expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), POSITION)).toBe("[100, 200]");
+  expect(await page.evaluate(() => window.__mockAE!.undoGroups())).toEqual(["Expression IDE: Position"]);
+});
+
+test("an AE error after apply squiggles its line and badges the tree", async ({ page }) => {
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "const s = 50;\n\ns *");
+  await page.keyboard.press(`${mod}+S`);
+  await expect(page.getByTestId("status-message")).toContainText("line 3");
+  await expect(row(page, "100:13:ADBE Transform Group/ADBE Scale")).toContainText("⚠");
+  await expect(page.locator(".monaco-editor .squiggly-error")).not.toHaveCount(0);
+});
+
+test("filter finds properties by word prefix", async ({ page }) => {
+  await page.getByLabel("Filter properties").fill("rot");
+  await expect(row(page, "100:13:ADBE Transform Group/ADBE Rotate Z")).toBeVisible();
+  await expect(row(page, "100:13:ADBE Transform Group/ADBE Anchor Point")).toHaveCount(0);
+});

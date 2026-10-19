@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "module": "esnext",
+    "noLib": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [
+      "./global",
+      "../../node_modules/types-for-adobe/AfterEffects/25.4",
+      "../../node_modules/types-for-adobe/shared/PlugPlugExternalObject"
+    ]
+  },
+  "include": ["./**/*"]
+}
