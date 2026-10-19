@@ -44,7 +44,8 @@ const config: CEP_Config = {
   zxp: {
     country: "GB",
     province: "London",
-    org: "Expression Suite",
+    // Passed to ZXPSignCmd unquoted by vite-cep-plugin: no spaces.
+    org: "ExpressionSuite",
     password: "password",
     tsa: [
       "http://timestamp.digicert.com/", // Windows Only

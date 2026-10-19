@@ -57,3 +57,7 @@ showed a better way. Newest at the bottom.
 19. **Testing:** Vitest for units (happy-dom for the store), and Playwright against the mock with the same fixture.
     `vitest.config.ts` is separate because `vite.config.ts` starts the CEP and ExtendScript builds as a side effect.
     `BROWSER_ONLY=true` skips them for the Playwright dev server.
+20. **ZXP builds on a Windows CI runner** (`.github/workflows/zxp.yml`), since ZXPSignCmd ships only for Windows and
+    macOS, and installs go through the ZXP/UXP Installer (no Node or `regedit` on the work machine). The signing
+    `org` has no spaces because vite-cep-plugin passes it to ZXPSignCmd unquoted. A signing failure is only logged, so
+    the workflow fails when no `.zxp` comes out.
