@@ -6,10 +6,10 @@ These items cover what only AE can answer. Tick each one off, or note what happe
 ## Phase 1
 
 ### Loading
-- [ ] After `npm run build` and restarting AE, **Window › Extensions › Expression IDE** opens the panel.
+- [ ] After installing the ZXP ([INSTALL.md](INSTALL.md)) and restarting AE, **Window › Extensions › Expression IDE** opens the panel.
 - [ ] The status bar shows no "After Effects isn't answering" message, which means the host script loaded.
-- [ ] The devtools console (`http://localhost:8860`) shows no "Could not create web worker" warning from Monaco (inline
-      workers under `file://`).
+- [ ] Typing in the editor feels instant and autocomplete pops up (Monaco's workers started under `file://`). Optional, on a dev
+      machine only: the devtools console (`http://localhost:8860`) shows no "Could not create web worker" warning.
 
 ### Explorer
 - [ ] Selecting a layer in the timeline shows its properties in the panel within about 0.5 s.

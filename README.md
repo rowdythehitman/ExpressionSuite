@@ -53,6 +53,11 @@ __mockAE.undoGroups()                           // what Ctrl+Z would undo
 
 ### In After Effects
 
+**Locked-down machine (no admin, no Node):** install the signed ZXP that CI builds. See
+[`docs/INSTALL.md`](docs/INSTALL.md). It's a manual copy into your user extensions folder, with no `regedit`.
+
+**Development machine (hot reload):**
+
 1. Allow unsigned extensions (once per machine):
    - Windows: in `regedit`, under `HKEY_CURRENT_USER\Software\Adobe\CSXS.12`, add the string value `PlayerDebugMode` = `1`.
    - macOS: `defaults write com.adobe.CSXS.12 PlayerDebugMode 1`, then log out and back in (or `killall cfprefsd`).
@@ -62,7 +67,7 @@ __mockAE.undoGroups()                           // what Ctrl+Z would undo
    ExtendScript changes (`src/jsx`) rebuild too.
 5. Debug the panel at `http://localhost:8860` in Chrome. Run `npm run delsymlink` to remove the extension again.
 
-`npm run zxp` builds a self-signed ZXP in `dist/zxp` for installing on another machine.
+`npm run zxp` builds a self-signed ZXP in `dist/zxp` locally (Windows or macOS only; the signing tool has no Linux build).
 
 ## Layout
 
