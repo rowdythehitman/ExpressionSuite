@@ -412,3 +412,20 @@ button {
   padding: 0 4px;
   background: #a1260d;
 }
+
+.auto-apply {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 0 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-apply input {
+  margin: 0;
+  accent-color: var(--accent);
+}

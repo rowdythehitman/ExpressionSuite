@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureComp } from "../src/js/bridge/fixture";
 import { createMockBridge, type MockControl } from "../src/js/bridge/mock";
 import type { Bridge } from "../src/js/bridge/types";
-import { findNode, isDirty, setStoreBridge, useIde } from "../src/js/ide/store";
+import { AUTO_APPLY_MS, canAutoApply, findNode, isDirty, setStoreBridge, useIde } from "../src/js/ide/store";
 
 const TITLE = "100:13";
 const CTRLS = "100:11";
@@ -22,7 +22,10 @@ beforeEach(() => {
   ({ bridge, control } = createMockBridge(fixtureComp()));
   setStoreBridge(bridge);
   useIde.setState(initial, true);
+  // Auto-apply has its own tests; elsewhere it would race the explicit applies.
+  useIde.getState().setAutoApply(false);
 });
+
 
 describe("selection sync", () => {
   it("expands selected layers with Transform and Effects open, and collapses them again on deselect", async () => {
@@ -193,5 +196,57 @@ describe("double click", () => {
     const tabs = useIde.getState().tabs;
     expect(tabs).toHaveLength(1);
     expect(tabs[0]!.preview).toBe(false);
+  });
+});
+
+describe("auto-apply", () => {
+  beforeEach(async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().openProperty(SCALE, true);
+    useIde.getState().setAutoApply(true);
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    useIde.getState().setAutoApply(false);
+    vi.useRealTimers();
+  });
+
+  it("applies valid code once typing pauses, as one undo step", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(SCALE, "[5");
+    ide.updateCode(SCALE, "[50, 5");
+    ide.updateCode(SCALE, "[50, 50]");
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS - 100);
+    expect(control.undoGroups()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(control.getExpression(SCALE)).toBe("[50, 50]");
+    expect(control.undoGroups()).toEqual(["Expression IDE: Scale"]);
+    expect(useIde.getState().status?.text).toBe("Auto-applied: Title_Text › Scale");
+  });
+
+  it("never auto-applies a syntax error or an emptied field", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(SCALE, "[50, ");
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
+    ide.updateCode(SCALE, "  ");
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
+    expect(control.undoGroups()).toEqual([]);
+    expect(canAutoApply({ ...useIde.getState().tabs[0]!, code: "[1, 2]" })).toBe(true);
+  });
+
+  it("does nothing when switched off, and an explicit apply cancels the pending one", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(SCALE, "[1, 1]");
+    ide.setAutoApply(false);
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
+    expect(control.undoGroups()).toEqual([]);
+
+    ide.setAutoApply(true);
+    ide.updateCode(SCALE, "[2, 2]");
+    const applied = ide.apply(SCALE); // the mock answers on a timer too
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
+    await applied;
+    expect(control.undoGroups()).toEqual(["Expression IDE: Scale"]);
   });
 });

@@ -86,3 +86,22 @@ test("reset closes tabs and reloads; messages can be dismissed", async ({ page }
   await page.getByLabel("Dismiss message").click();
   await expect(page.getByTestId("status-message")).toHaveCount(0);
 });
+
+test("auto-apply: valid code applies after a pause; a syntax error squiggles and waits", async ({ page }) => {
+  const scale = "100:13:ADBE Transform Group/ADBE Scale";
+  await expect(page.getByLabel("Auto-apply")).toBeChecked();
+  await row(page, scale).dblclick();
+  await typeInEditor(page, "value *");
+  await expect(page.locator(".monaco-editor .squiggly-error")).not.toHaveCount(0);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__mockAE!.undoGroups())).toEqual([]);
+  await page.keyboard.type(" 2");
+  await expect(page.getByTestId("status-message")).toHaveText("Auto-applied: Title_Text › Scale", { timeout: 3000 });
+  expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), scale)).toBe("value * 2");
+  await expect(page.locator(".monaco-editor .squiggly-error")).toHaveCount(0);
+
+  await page.getByLabel("Auto-apply").uncheck();
+  await page.keyboard.type(";");
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), scale)).toBe("value * 2");
+});

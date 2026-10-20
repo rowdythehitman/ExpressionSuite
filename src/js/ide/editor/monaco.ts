@@ -11,7 +11,8 @@ self.MonacoEnvironment = {
   },
 };
 
-// Expressions aren't browser code: no DOM in completions, and no semantic errors until AE typings arrive (phase 2).
+// Expressions aren't browser code: no DOM in completions. Syntax errors come from acorn (syntax.ts), so the
+// TypeScript worker's own diagnostics are off; it only powers completions and hovers.
 monaco.typescript.javascriptDefaults.setCompilerOptions({
   target: monaco.typescript.ScriptTarget.ES2020,
   lib: ["es2020"],
@@ -20,7 +21,7 @@ monaco.typescript.javascriptDefaults.setCompilerOptions({
 });
 monaco.typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
-  noSyntaxValidation: false,
+  noSyntaxValidation: true,
 });
 
 monaco.editor.defineTheme("ae-dark", {

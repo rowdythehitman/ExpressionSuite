@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { type Bridge, BridgeError, type CompTree, getBridge, type TreeNode } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
+import { checkSyntax } from "./editor/syntax";
 import { childrenOf } from "./tree/flatten";
 
 export type Mode = "selection" | "comp";
@@ -39,6 +40,8 @@ export interface IdeState {
   tabs: Tab[];
   activeTab: string | null;
   status: Status | null;
+  /** Apply automatically once typing pauses and the code parses (spec: "Apply on pause"). */
+  autoApply: boolean;
   /** Bumped to make the selection poller refetch the tree even though AE's hash hasn't changed. */
   refreshNonce: number;
 
@@ -53,11 +56,40 @@ export interface IdeState {
   closeTab(key: string): void;
   setActiveTab(key: string): void;
   updateCode(key: string, code: string): void;
-  apply(key: string): Promise<void>;
+  apply(key: string, auto?: boolean): Promise<void>;
+  setAutoApply(on: boolean): void;
   applyAll(): Promise<void>;
   setStatus(status: Status | null): void;
   /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
   reset(status?: Status | null): void;
+}
+
+/** Pause after the last keystroke before an automatic apply. */
+export const AUTO_APPLY_MS = 1000;
+const AUTO_APPLY_KEY = "expression-ide.autoApply";
+
+function storedAutoApply(): boolean {
+  try {
+    return localStorage.getItem(AUTO_APPLY_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/** Auto-apply is "safe" when the code changed, isn't empty (clearing a field mid-edit mustn't remove the
+ * expression; Ctrl+S still can) and parses. */
+export function canAutoApply(tab: Tab): boolean {
+  return isDirty(tab) && tab.code.trim() !== "" && checkSyntax(tab.code) === null;
+}
+
+const autoTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function cancelAutoApply(key?: string): void {
+  for (const [k, t] of autoTimers) {
+    if (key === undefined || k === key) {
+      clearTimeout(t);
+      autoTimers.delete(k);
+    }
+  }
 }
 
 let bridgeOverride: Bridge | null = null;
@@ -196,6 +228,7 @@ export const useIde = create<IdeState>((set, get) => {
     tabs: [],
     activeTab: null,
     status: null,
+    autoApply: storedAutoApply(),
     refreshNonce: 0,
 
     async setTree(tree) {
@@ -288,6 +321,7 @@ export const useIde = create<IdeState>((set, get) => {
     pinTab: (key) => set({ tabs: get().tabs.map((t) => (t.key === key ? { ...t, preview: false } : t)) }),
 
     closeTab(key) {
+      cancelAutoApply(key);
       const tabs = get().tabs;
       const i = tabs.findIndex((t) => t.key === key);
       if (i < 0) return;
@@ -301,9 +335,31 @@ export const useIde = create<IdeState>((set, get) => {
     updateCode(key, code) {
       // Editing a preview tab keeps it, as in VS Code.
       set({ tabs: get().tabs.map((t) => (t.key === key ? { ...t, code, preview: t.preview && code === t.original } : t)) });
+      cancelAutoApply(key);
+      const tab = get().tabs.find((t) => t.key === key);
+      if (!get().autoApply || !tab || !canAutoApply(tab)) return;
+      autoTimers.set(
+        key,
+        setTimeout(() => {
+          autoTimers.delete(key);
+          const now = get().tabs.find((t) => t.key === key);
+          if (get().autoApply && now && now.code === code && canAutoApply(now)) get().apply(key, true);
+        }, AUTO_APPLY_MS),
+      );
     },
 
-    async apply(key) {
+    setAutoApply(on) {
+      try {
+        localStorage.setItem(AUTO_APPLY_KEY, on ? "on" : "off");
+      } catch {
+        // A convenience only.
+      }
+      if (!on) cancelAutoApply();
+      set({ autoApply: on });
+    },
+
+    async apply(key, auto = false) {
+      cancelAutoApply(key);
       const tab = get().tabs.find((t) => t.key === key);
       if (!tab) return;
       const code = tab.code;
@@ -315,7 +371,7 @@ export const useIde = create<IdeState>((set, get) => {
           ...replaceNode(get(), res.node),
           status: res.error
             ? { kind: "error", text: `${label}: ${parseAeError(res.error).summary}`, detail: res.error }
-            : { kind: "ok", text: code === "" ? `Removed expression: ${label}` : `Applied: ${label}` },
+            : { kind: "ok", text: code === "" ? `Removed expression: ${label}` : `${auto ? "Auto-applied" : "Applied"}: ${label}` },
         });
       } catch (e) {
         set({ status: { kind: "error", text: `${label}: ${errorText(e)}` } });
@@ -330,6 +386,7 @@ export const useIde = create<IdeState>((set, get) => {
 
     reset(status = null) {
       autoExpanded = [];
+      cancelAutoApply();
       set({
         tree: null,
         loaded: {},

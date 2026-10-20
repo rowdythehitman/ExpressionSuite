@@ -4,6 +4,7 @@ import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { findNode, isDirty, useIde, type Tab } from "../store";
 import { monaco } from "./monaco";
+import { checkSyntax } from "./syntax";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
 export const modelPath = (key: string) => `file:///ide/${encodeURIComponent(key)}.js`;
@@ -75,7 +76,18 @@ function TabBar({ tabs, activeTab }: { tabs: Tab[]; activeTab: string | null }) 
           </button>
         </div>
       ))}
+      <AutoApplyToggle />
     </div>
+  );
+}
+
+function AutoApplyToggle() {
+  const autoApply = useIde((s) => s.autoApply);
+  return (
+    <label className="auto-apply" title="Apply automatically 1 s after you stop typing, when the code has no syntax errors">
+      <input type="checkbox" checked={autoApply} onChange={(e) => useIde.getState().setAutoApply(e.target.checked)} />
+      Auto-apply
+    </label>
   );
 }
 
@@ -125,6 +137,33 @@ function CodeEditor({ tab }: { tab: Tab }) {
   useEffect(() => {
     const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
     if (model && model.getValue() !== tab.code) model.setValue(tab.code);
+  }, [tab.key, tab.code]);
+
+  // Instant syntax squiggle (acorn), 200 ms after typing stops.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
+      if (!model) return;
+      const issue = checkSyntax(tab.code);
+      const line = issue ? Math.min(issue.line, model.getLineCount()) : 1;
+      monaco.editor.setModelMarkers(
+        model,
+        "syntax",
+        issue
+          ? [
+              {
+                severity: monaco.MarkerSeverity.Error,
+                message: `SyntaxError: ${issue.message}`,
+                startLineNumber: line,
+                endLineNumber: line,
+                startColumn: issue.column,
+                endColumn: Math.max(issue.column + 1, model.getLineMaxColumn(line)),
+              },
+            ]
+          : [],
+      );
+    }, 200);
+    return () => clearTimeout(timer);
   }, [tab.key, tab.code]);
 
   // AE's error from the last apply, on its line.
