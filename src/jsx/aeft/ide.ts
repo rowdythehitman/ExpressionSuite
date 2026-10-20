@@ -658,3 +658,23 @@ export const addControl = (layerId: number, matchName: string, name: string, val
     app.endUndoGroup();
   }
 };
+
+/** Several controls on one layer as one undo step (snippets). Returns each effect's name as AE has it. */
+export const addControls = (layerId: number, items: { matchName: string; name: string; value: number | number[] }[], undoName: string): string[] => {
+  const layer: any = app.project.layerByID(layerId);
+  if (!layer) fail("NOT_FOUND", "The layer no longer exists.");
+  const names: string[] = [];
+  app.beginUndoGroup(undoName);
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i] as { matchName: string; name: string; value: number | number[] };
+      const fx = layer.property("ADBE Effect Parade").addProperty(item.matchName);
+      fx.name = item.name;
+      fx.property(1).setValue(item.value);
+      names.push(fx.name);
+    }
+  } finally {
+    app.endUndoGroup();
+  }
+  return names;
+};

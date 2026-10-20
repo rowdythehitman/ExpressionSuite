@@ -137,6 +137,27 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
     return prop;
   }
 
+  function addEffect(layerId: number, matchName: string, name: string, value: unknown): string {
+    const layer = comp.layers.find((l) => l.id === layerId);
+    if (!layer) throw new BridgeError("NOT_FOUND", "The layer no longer exists.");
+    let parade = layer.children.find((c) => c.matchName === "ADBE Effect Parade");
+    if (!parade) {
+      parade = { name: "Effects", matchName: "ADBE Effect Parade", children: [] };
+      layer.children.unshift(parade);
+    }
+    const params: Record<string, [string, MockProp["valueType"]]> = {
+      "ADBE Slider Control": ["Slider", "1D"],
+      "ADBE Point Control": ["Point", "2D"],
+      "ADBE Point3D Control": ["3D Point", "3D"],
+      "ADBE Checkbox Control": ["Checkbox", "1D"],
+      "ADBE Layer Control": ["Layer", "OTHER"],
+    };
+    const [param, valueType] = params[matchName] ?? ["Value", "OTHER"];
+    parade.children!.push({ name, matchName, children: [{ name: param, matchName: `${matchName}-0001`, valueType, value }] });
+    version++;
+    return name;
+  }
+
   function assign(key: string, p: MockProp, code: string): ApplyResult {
     const { layer } = find(key);
     const at = { property: p.name, layerIndex: comp.layers.indexOf(layer) + 1, layerName: layer.name, compName: comp.name };
@@ -286,25 +307,15 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
 
     addControl: (layerId, matchName, name, value) =>
       delay(() => {
-        const layer = comp.layers.find((l) => l.id === layerId);
-        if (!layer) throw new BridgeError("NOT_FOUND", "The layer no longer exists.");
-        let parade = layer.children.find((c) => c.matchName === "ADBE Effect Parade");
-        if (!parade) {
-          parade = { name: "Effects", matchName: "ADBE Effect Parade", children: [] };
-          layer.children.unshift(parade);
-        }
-        const params: Record<string, [string, MockProp["valueType"]]> = {
-          "ADBE Slider Control": ["Slider", "1D"],
-          "ADBE Point Control": ["Point", "2D"],
-          "ADBE Point3D Control": ["3D Point", "3D"],
-          "ADBE Checkbox Control": ["Checkbox", "1D"],
-        };
-        const [param, valueType] = params[matchName] ?? ["Value", "OTHER"];
-        parade.children!.push({ name, matchName, children: [{ name: param, matchName: `${matchName}-0001`, valueType, value }] });
         undo.push(`Expression IDE: add ${name}`);
-        version++;
-        return name;
+        return addEffect(layerId, matchName, name, value);
       }, "addControl"),
+
+    addControls: (layerId, items, undoName) =>
+      delay(() => {
+        undo.push(undoName);
+        return items.map((i) => addEffect(layerId, i.matchName, i.name, i.value));
+      }, "addControls"),
 
     sampleValues: (key, count) =>
       delay(() => {

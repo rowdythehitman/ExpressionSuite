@@ -9,7 +9,8 @@ import type { Rgb } from "../bridge/panel";
 import { loadSettings, resolvedTheme, saveSettings, type Settings } from "./settings";
 import { checkNames } from "./editor/names";
 import { checkSyntax } from "./editor/syntax";
-import { CONTROL_SPECS, type Controllable, uniqueName } from "./references/controls";
+import { CONTROL_SPECS, type Controllable, type ControlKind, uniqueName } from "./references/controls";
+import { fillSnippet, SNIPPETS } from "./snippets";
 import { describeRenames, detectRenames, renameInCode, type Rename } from "./references/rename";
 import { generateReference, type RefContext, type RefTarget, type Reference } from "./references/reference";
 import { childrenOf } from "./tree/flatten";
@@ -102,6 +103,11 @@ export interface IdeState {
   /** Creates an expression control for a literal in a tab's code (on the tab's layer, or the first pinned layer in
    * the comp) and returns the reference that should replace the literal; null if it couldn't. */
   makeControl(tabKey: string, c: Controllable, onPinned: boolean): Promise<Reference | null>;
+  /** Creates a snippet's controls on the tab's layer and queues its code for insertion at the cursor. */
+  insertSnippet(tabKey: string, snippetId: string): Promise<void>;
+  /** Text waiting to be inserted into a tab's editor at the cursor (snippets); the editor takes it and clears it. */
+  pendingInsert: { key: string; text: string; nonce: number } | null;
+  clearPendingInsert(): void;
   /** Samples a property across the work area (value graph); null if it can't be read. */
   sampleValues(key: string): Promise<ValueSamples | null>;
   /** Reads the values of references written in a tab's code (inline values). */
@@ -387,6 +393,68 @@ export const useIde = create<IdeState>((set, get) => {
     });
   }
 
+  /**
+   * Creates controls on the tab's layer (or the first pinned layer in the comp), with names made unique on that
+   * layer, as one undo step. Returns each requested name's reference, relative to the tab; null if it failed.
+   */
+  async function createControls(
+    tabKey: string,
+    controls: { name: string; kind: ControlKind; value: number | number[] }[],
+    onPinned: boolean,
+    undoName: string | null,
+  ): Promise<Record<string, string> | null> {
+    const state = get();
+    const p = parseKey(tabKey);
+    const tree = state.tree;
+    if (!p || !tree || tree.comp.id !== p.compId) return null;
+    const layer = onPinned
+      ? tree.layers.find((l) => state.pinned.includes(l.name))
+      : tree.layers.find((l) => l.key === layerKey(p.compId, p.layerId));
+    if (!layer) {
+      set({ status: { kind: "info", text: "No pinned layer in this comp: right-click a layer › Pin to top first." } });
+      return null;
+    }
+    const layerId = parseKey(layer.key)!.layerId;
+    const taken = [...(state.schema?.layers.find((l) => l.id === layerId)?.effects.map((e) => e.name) ?? [])];
+    const items = controls.map((c) => {
+      const name = uniqueName(c.name, taken);
+      taken.push(name);
+      return { matchName: CONTROL_SPECS[c.kind].effect, name, value: c.value };
+    });
+    let names: string[];
+    try {
+      names =
+        undoName === null && items.length === 1
+          ? [await bridge().addControl(layerId, items[0]!.matchName, items[0]!.name, items[0]!.value)]
+          : await bridge().addControls(layerId, items, undoName ?? "Expression IDE: add controls");
+    } catch (e) {
+      set({ status: { kind: "error", text: `Couldn't add the control: ${errorText(e)}` } });
+      return null;
+    }
+    const refs: Record<string, string> = {};
+    controls.forEach((c, i) => {
+      const spec = CONTROL_SPECS[c.kind];
+      const target: RefTarget = {
+        compId: tree.comp.id,
+        compName: tree.comp.name,
+        layerId,
+        layerIndex: layer.index ?? 0,
+        layerName: layer.name,
+        layerMatchName: layer.matchName,
+        path: [
+          { name: "Effects", matchName: "ADBE Effect Parade" },
+          { name: names[i]!, matchName: spec.effect },
+          { name: spec.param, matchName: `${spec.effect}-0001` },
+        ],
+      };
+      refs[c.name] = generateReference(target, referenceContext(get(), target, tabKey)).code;
+    });
+    // The tree and the comp names (completions, name check) pick up the new effects.
+    const what = names.length === 1 ? `${CONTROL_SPECS[controls[0]!.kind].label} Control “${names[0]}”` : `${names.length} controls (${names.join(", ")})`;
+    set({ refreshNonce: get().refreshNonce + 1, status: { kind: "ok", text: `Added ${what} on ${layer.name}.` } });
+    return refs;
+  }
+
   /** Records a version in local history; on a property's first entry, also the version it replaced. */
   function record(key: string, before: string | undefined, code: string, source: HistorySource): void {
     const history = { ...get().history };
@@ -451,6 +519,7 @@ export const useIde = create<IdeState>((set, get) => {
     problems: null,
     problemsOpen: false,
     renameOffer: null,
+    pendingInsert: null,
     loaded: {},
     expanded: {},
     loading: {},
@@ -592,49 +661,20 @@ export const useIde = create<IdeState>((set, get) => {
     },
 
     async makeControl(tabKey, c, onPinned) {
-      const state = get();
-      const p = parseKey(tabKey);
-      const tree = state.tree;
-      if (!p || !tree || tree.comp.id !== p.compId) return null;
-      const layer = onPinned
-        ? tree.layers.find((l) => state.pinned.includes(l.name))
-        : tree.layers.find((l) => l.key === layerKey(p.compId, p.layerId));
-      if (!layer) {
-        set({ status: { kind: "info", text: "No pinned layer in this comp: right-click a layer › Pin to top first." } });
-        return null;
-      }
-      const layerId = parseKey(layer.key)!.layerId;
-      const spec = CONTROL_SPECS[c.kind];
-      const taken = state.schema?.layers.find((l) => l.id === layerId)?.effects.map((e) => e.name) ?? [];
-      const wanted = uniqueName(c.name, taken);
-      const value = typeof c.value === "boolean" ? (c.value ? 1 : 0) : c.value;
-      let name: string;
-      try {
-        name = await bridge().addControl(layerId, spec.effect, wanted, value);
-      } catch (e) {
-        set({ status: { kind: "error", text: `Couldn't add the control: ${errorText(e)}` } });
-        return null;
-      }
-      const target: RefTarget = {
-        compId: tree.comp.id,
-        compName: tree.comp.name,
-        layerId,
-        layerIndex: layer.index ?? 0,
-        layerName: layer.name,
-        layerMatchName: layer.matchName,
-        path: [
-          { name: "Effects", matchName: "ADBE Effect Parade" },
-          { name, matchName: spec.effect },
-          { name: spec.param, matchName: `${spec.effect}-0001` },
-        ],
-      };
-      // The tree and the comp names (completions, name check) pick up the new effect.
-      set({
-        refreshNonce: get().refreshNonce + 1,
-        status: { kind: "ok", text: `Added ${spec.label} Control “${name}” on ${layer.name}.` },
-      });
-      return generateReference(target, referenceContext(get(), target, tabKey));
+      const refs = await createControls(tabKey, [{ name: c.name, kind: c.kind, value: typeof c.value === "boolean" ? (c.value ? 1 : 0) : c.value }], onPinned, null);
+      return refs ? { code: refs[c.name]! } : null;
     },
+
+    async insertSnippet(tabKey, id) {
+      const snippet = SNIPPETS.find((s) => s.id === id);
+      if (!snippet) return;
+      const refs = snippet.controls.length ? await createControls(tabKey, snippet.controls, false, `Expression IDE: ${snippet.label}`) : {};
+      if (!refs) return;
+      set({ pendingInsert: { key: tabKey, text: fillSnippet(snippet.body, refs), nonce: Date.now() } });
+      if (!snippet.controls.length) set({ status: { kind: "ok", text: `Inserted ${snippet.label}.` } });
+    },
+
+    clearPendingInsert: () => set({ pendingInsert: null }),
 
     async sampleValues(key) {
       try {

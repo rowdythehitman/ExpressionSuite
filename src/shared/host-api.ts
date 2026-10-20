@@ -20,5 +20,6 @@ export interface HostApi {
   readReferences(compId: number, layerId: number, paths: RefPath[]): (ValueReading | null)[];
   sampleValues(key: string, count: number): ValueSamples;
   addControl(layerId: number, matchName: string, name: string, value: number | number[]): string;
+  addControls(layerId: number, items: { matchName: string; name: string; value: number | number[] }[], undoName: string): string[];
   findAllExpressions(): ExpressionScan | null;
 }

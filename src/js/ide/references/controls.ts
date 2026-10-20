@@ -1,13 +1,14 @@
 // "Make control": turn a literal in the code into an expression control and a reference to it.
 import { parse } from "acorn";
 
-export type ControlKind = "slider" | "point" | "point3d" | "checkbox";
+export type ControlKind = "slider" | "point" | "point3d" | "checkbox" | "layer";
 
 export const CONTROL_SPECS: Record<ControlKind, { effect: string; param: string; label: string }> = {
   slider: { effect: "ADBE Slider Control", param: "Slider", label: "Slider" },
   point: { effect: "ADBE Point Control", param: "Point", label: "Point" },
   point3d: { effect: "ADBE Point3D Control", param: "3D Point", label: "3D Point" },
   checkbox: { effect: "ADBE Checkbox Control", param: "Checkbox", label: "Checkbox" },
+  layer: { effect: "ADBE Layer Control", param: "Layer", label: "Layer" },
 };
 
 export interface Controllable {

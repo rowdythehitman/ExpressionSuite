@@ -678,3 +678,19 @@ describe("make control", () => {
     expect(ref?.code).toBe('thisComp.layer("CTRLS").effect("Speed 2")("Point")');
   });
 });
+
+describe("snippets", () => {
+  it("creates the snippet's controls in one undo step and queues its code", async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().setSchema(await bridge.getCompSchema());
+    await useIde.getState().openProperty(POSITION, true);
+    await useIde.getState().insertSnippet(POSITION, "wiggle-sliders");
+    expect(control.undoGroups()).toEqual(["Expression IDE: Wiggle with sliders"]);
+    expect(useIde.getState().pendingInsert?.text).toBe('wiggle(effect("Frequency")("Slider"), effect("Amplitude")("Slider"))');
+    // A second time, the names don't clash.
+    await useIde.getState().setSchema(await bridge.getCompSchema());
+    await useIde.getState().insertSnippet(POSITION, "wiggle-sliders");
+    expect(useIde.getState().pendingInsert?.text).toBe('wiggle(effect("Frequency 2")("Slider"), effect("Amplitude 2")("Slider"))');
+  });
+});

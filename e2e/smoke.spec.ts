@@ -433,3 +433,14 @@ test("make a slider from a number in the code", async ({ page }) => {
   // The new effect shows up in the (already open) Effects group.
   await expect(page.locator('.row:has-text("Wiggle Amplitude")')).toBeVisible();
 });
+
+test("snippets insert code and create their controls", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, POSITION).dblclick();
+  await typeInEditor(page, "");
+  await page.getByRole("button", { name: "Snippets ▾" }).click();
+  await page.getByRole("menuitem", { name: /Wiggle with sliders/ }).click();
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('wiggle(effect("Frequency")("Slider"), effect("Amplitude")("Slider"))');
+  await expect(page.getByTestId("status-message")).toHaveText("Added 2 controls (Frequency, Amplitude) on Title_Text.");
+  await expect(page.locator('.row:has-text("Frequency")')).toBeVisible();
+});

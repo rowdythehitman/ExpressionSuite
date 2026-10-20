@@ -11,6 +11,7 @@ import { findControllable } from "../references/controls";
 import { declaredReferences } from "../references/resolve";
 import { formatValue } from "./format";
 import { HistoryPanel } from "./HistoryPanel";
+import { SnippetsMenu } from "./SnippetsMenu";
 import { ValueStrip } from "./ValueStrip";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
@@ -169,6 +170,7 @@ function TabBar({ tabs, activeTab }: { tabs: Tab[]; activeTab: string | null }) 
           </button>
         </div>
       ))}
+      <SnippetsMenu activeTab={activeTab} />
       <BatchButton activeTab={activeTab} />
       <AutoApplyToggle />
       <SplitButton activeTab={activeTab} />
@@ -403,6 +405,14 @@ function CodeEditor({ tab }: { tab: Tab }) {
     const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
     if (model && model.getValue() !== tab.code) model.setValue(tab.code);
   }, [tab.key, tab.code]);
+
+  // Snippet code waiting for this tab goes in at the cursor (the main editor takes it).
+  const pending = useIde((s) => s.pendingInsert);
+  useEffect(() => {
+    if (!pending || pending.key !== tab.key || !editorInstance || useIde.getState().activeTab !== tab.key) return;
+    useIde.getState().clearPendingInsert();
+    insertText(editorInstance, pending.text);
+  }, [pending, tab.key, editorInstance]);
 
   // The main editor sets the completion context whenever its tab or the comp changes; the split one on focus.
   const isMain = useIde((s) => s.activeTab === tab.key);

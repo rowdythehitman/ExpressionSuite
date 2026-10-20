@@ -33,6 +33,8 @@ export interface Bridge {
   sampleValues(key: string, count: number): Promise<ValueSamples>;
   /** Adds an expression control to a layer, set to `value`, as one undo step; resolves to the effect's name. */
   addControl(layerId: number, matchName: string, name: string, value: number | number[]): Promise<string>;
+  /** Several controls on one layer as one undo step; resolves to their names. */
+  addControls(layerId: number, items: { matchName: string; name: string; value: number | number[] }[], undoName: string): Promise<string[]>;
   /** Every expression in the active comp, with AE's error for each (Problems list). */
   findAllExpressions(): Promise<ExpressionScan | null>;
 }

@@ -523,6 +523,58 @@ button {
   background: #a1260d;
 }
 
+.snippets {
+  position: relative;
+  margin-left: auto;
+  display: flex;
+}
+
+.snippets-button {
+  padding: 0 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.snippets-button:hover {
+  color: var(--text);
+}
+
+.snippets + .batch-button {
+  margin-left: 0;
+}
+
+.snippets-popover {
+  position: absolute;
+  z-index: 60;
+  top: 28px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  padding: 4px 0;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.snippets-popover button {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 12px;
+  text-align: left;
+}
+
+.snippets-popover button:hover {
+  background: var(--bg-active);
+}
+
+.snippet-desc {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
 .batch-button {
   margin-left: auto;
   padding: 0 10px;
@@ -534,7 +586,8 @@ button {
   color: var(--text);
 }
 
-.batch-button + .auto-apply {
+.batch-button + .auto-apply,
+.snippets + .auto-apply {
   margin-left: 0;
 }
 
