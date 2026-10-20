@@ -225,3 +225,15 @@ test("value strip follows the playhead and shows colours", async ({ page }) => {
   await row(page, "100:11:ADBE Effect Parade/ADBE Color Control/ADBE Color Control-0001").click();
   await expect(strip.locator(".swatch")).toBeVisible();
 });
+
+test("problems list shows the comp's errors and opens them", async ({ page }) => {
+  await page.getByRole("button", { name: /Problems/ }).click();
+  const panel = page.getByRole("region", { name: "Problems" });
+  await expect(panel).toContainText("1 error in 4 expressions");
+  await expect(panel).toContainText("3 Title_Text › Transform › Rotation");
+  await expect(panel).toContainText("Line 1: SyntaxError: Unexpected end of input");
+  await expect(page.locator(".problems-toggle")).toHaveText("⚠ 1");
+  await panel.getByRole("button", { name: /Rotation/ }).click();
+  await expect(page.getByRole("tab", { name: /Title_Text › Rotation/ })).toBeVisible();
+  await expect(page.locator('.row.selected[data-key="100:13:ADBE Transform Group/ADBE Rotate Z"]')).toBeVisible();
+});

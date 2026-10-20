@@ -37,6 +37,7 @@ export function createCepBridge(): Bridge {
     revealInTimeline: (key) => call("revealInTimeline", key),
     getSelectedRef: () => call("getSelectedRef"),
     getCompSchema: () => call("getCompSchema"),
+    findAllExpressions: () => call("findAllExpressions"),
     // ExtendScript can't take `undefined` through JSON; omit the argument instead.
     getValueAtTime: (key, time) => (time === undefined ? call("getValueAtTime", key) : call("getValueAtTime", key, time)),
   };

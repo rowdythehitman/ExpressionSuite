@@ -310,3 +310,38 @@ describe("value strip", () => {
     expect(useIde.getState().reading?.reading.error).toMatch(/SyntaxError/);
   });
 });
+
+describe("problems", () => {
+  it("scans only while open (or when forced), and refreshes after an apply", async () => {
+    control.selectLayers([13]);
+    await sync();
+    const ide = useIde.getState();
+    await ide.refreshProblems();
+    expect(useIde.getState().problems).toBeNull();
+    ide.setProblemsOpen(true);
+    await ide.refreshProblems();
+    const scan = useIde.getState().problems!;
+    expect(scan.entries.map((e) => e.path.join(" › "))).toEqual([
+      "Text › Source Text",
+      "Transform › Position",
+      "Transform › Rotation",
+      "Transform › Opacity",
+    ]);
+    expect(scan.entries.filter((e) => e.error).map((e) => e.key)).toEqual(["100:13:ADBE Transform Group/ADBE Rotate Z"]);
+    await ide.openProperty(SCALE, true);
+    ide.updateCode(SCALE, "1 +");
+    await ide.apply(SCALE);
+    await vi.waitFor(() => expect(useIde.getState().problems!.entries.filter((e) => e.error)).toHaveLength(2));
+  });
+
+  it("reveals a property in the tree, loading its groups", async () => {
+    control.selectLayers([]);
+    await sync();
+    const shadowOpacity = "100:13:ADBE Effect Parade/ADBE Drop Shadow/ADBE Drop Shadow-0002";
+    await useIde.getState().revealInTree(shadowOpacity);
+    const s = useIde.getState();
+    expect(s.selectedKey).toBe(shadowOpacity);
+    expect(findNode(s, shadowOpacity)?.name).toBe("Opacity");
+    expect(s.expanded["100:13"]).toBe(true);
+  });
+});

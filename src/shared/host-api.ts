@@ -1,4 +1,4 @@
-import type { ApplyResult, CompSchema, CompTree, RefTarget, SelectionHash, TreeNode, ValueReading } from "./types";
+import type { ApplyResult, CompSchema, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "./types";
 
 /**
  * The functions src/jsx exposes on the extension namespace. src/jsx/index.ts checks the host implements it, and
@@ -15,4 +15,5 @@ export interface HostApi {
   getSelectedRef(): RefTarget | null;
   getCompSchema(): CompSchema | null;
   getValueAtTime(key: string, time?: number): ValueReading;
+  findAllExpressions(): ExpressionScan | null;
 }

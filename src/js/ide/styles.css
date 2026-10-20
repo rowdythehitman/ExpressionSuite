@@ -281,6 +281,7 @@ button {
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--bg-editor);
 }
 
@@ -497,5 +498,79 @@ button {
   width: 14px;
   height: 14px;
   border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.problems {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  max-height: 35%;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sidebar);
+}
+
+.problems-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.problems-header span {
+  flex: 1;
+}
+
+.problems-rows {
+  overflow: auto;
+}
+
+.problem {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.problem:hover {
+  background: var(--bg-hover);
+}
+
+.problem .badge.err {
+  margin-left: 0;
+}
+
+.problem .where {
+  color: var(--text);
+}
+
+.problem .what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+}
+
+.problem .off {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.problems-toggle {
+  padding: 0 4px;
+}
+
+.problems-toggle.has-errors {
+  background: #a1260d;
   border-radius: 2px;
 }

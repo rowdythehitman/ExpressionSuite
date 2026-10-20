@@ -105,3 +105,21 @@ export interface ValueReading {
   /** Evaluation failed (usually the expression's own error). */
   error?: string;
 }
+
+/** One expression in the comp (Problems list; the rename scan in phase 4). */
+export interface ExpressionEntry {
+  key: string;
+  layerIndex: number;
+  layerName: string;
+  /** Group and property names below the layer. */
+  path: string[];
+  expression: string;
+  enabled: boolean;
+  error?: string;
+}
+
+export interface ExpressionScan {
+  entries: ExpressionEntry[];
+  /** The walk stopped early on a very large comp. */
+  truncated: boolean;
+}

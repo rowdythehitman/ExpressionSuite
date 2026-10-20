@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, CompSchema, CompTree, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+import type { ApplyResult, CompSchema, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -485,4 +485,46 @@ export const getValueAtTime = (key: string, time?: number): ValueReading => {
   else if (r.prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT && v) value = String(v.text);
   else if (r.prop.propertyValueType === PropertyValueType.SHAPE && v) value = "Path (" + v.vertices.length + " points" + (v.closed ? ", closed" : "") + ")";
   return { time: t, value: value };
+};
+
+/** How many properties findAllExpressions visits before giving up on a huge comp. */
+const SCAN_ALL_BUDGET = 20000;
+
+export const findAllExpressions = (): ExpressionScan | null => {
+  const comp = activeComp();
+  if (!comp) return null;
+  const entries: ExpressionEntry[] = [];
+  const state = { budget: SCAN_ALL_BUDGET };
+  function walk(layer: Layer, group: any, segs: string[], names: string[]): void {
+    const seen: { [mn: string]: number } = {};
+    for (let i = 1; i <= group.numProperties; i++) {
+      if (state.budget-- <= 0) return;
+      const p = group.property(i);
+      seen[p.matchName] = (seen[p.matchName] || 0) + 1;
+      if (skip(layer, comp as CompItem, group, p)) continue;
+      const s = segs.concat([segment(p.matchName, seen[p.matchName] as number)]);
+      const n = names.concat([p.name]);
+      if (p.propertyType === PropertyType.PROPERTY) {
+        if (p.canSetExpression && p.expression !== "") {
+          const entry: ExpressionEntry = {
+            key: propKey((comp as CompItem).id, layer.id, s),
+            layerIndex: layer.index,
+            layerName: layer.name,
+            path: n,
+            expression: p.expression,
+            enabled: p.expressionEnabled,
+          };
+          if (p.expressionError) entry.error = p.expressionError;
+          entries.push(entry);
+        }
+      } else {
+        walk(layer, p, s, n);
+      }
+    }
+  }
+  for (let i = 1; i <= comp.numLayers; i++) {
+    const layer = comp.layer(i);
+    walk(layer, layer, [], []);
+  }
+  return { entries: entries, truncated: state.budget <= 0 };
 };

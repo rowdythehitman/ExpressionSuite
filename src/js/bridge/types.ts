@@ -1,6 +1,6 @@
-import type { ApplyResult, CompSchema, CompTree, RefTarget, SelectionHash, TreeNode, ValueReading } from "../../shared/types";
+import type { ApplyResult, CompSchema, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "../../shared/types";
 
-export type { ApplyResult, CompInfo, CompSchema, CompTree, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+export type { ApplyResult, CompInfo, CompSchema, CompTree, ExpressionEntry, ExpressionScan, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** Everything the panels need from After Effects. The only implementations are cep.ts (real) and mock.ts. */
 export interface Bridge {
@@ -23,6 +23,8 @@ export interface Bridge {
   getCompSchema(): Promise<CompSchema | null>;
   /** The property's value after its expression, at `time` (default: the comp's current time). */
   getValueAtTime(key: string, time?: number): Promise<ValueReading>;
+  /** Every expression in the active comp, with AE's error for each (Problems list). */
+  findAllExpressions(): Promise<ExpressionScan | null>;
 }
 
 export type BridgeErrorCode = "NO_COMP" | "NOT_FOUND" | "HOST" | "TRANSPORT";

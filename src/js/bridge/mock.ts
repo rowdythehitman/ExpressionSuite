@@ -3,7 +3,7 @@
 import { parse } from "acorn";
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
 import type { MockComp, MockLayer, MockProp } from "./fixture";
-import { type ApplyResult, type Bridge, BridgeError, type CompSchema, type CompTree, type RefTarget, type TreeNode } from "./types";
+import { type ApplyResult, type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, type RefTarget, type TreeNode } from "./types";
 
 export interface MockControl {
   /** Select layers by id, as if clicked in the timeline. */
@@ -244,6 +244,33 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         const v = p.value;
         return { time: t, value: typeof v === "number" || typeof v === "string" || Array.isArray(v) ? (v as number | number[] | string) : null };
       }, "getValueAtTime"),
+
+    findAllExpressions: () =>
+      delay(() => {
+        const entries: ExpressionScan["entries"] = [];
+        const walk = (layer: MockLayer, index: number, children: MockProp[], segs: string[], names: string[]) => {
+          const seen: { [mn: string]: number } = {};
+          for (const p of children) {
+            seen[p.matchName] = (seen[p.matchName] ?? 0) + 1;
+            const s = [...segs, segment(p.matchName, seen[p.matchName]!)];
+            const n = [...names, p.name];
+            if (!isProperty(p)) walk(layer, index, p.children!, s, n);
+            else if (p.expression) {
+              entries.push({
+                key: propKey(comp.id, layer.id, s),
+                layerIndex: index,
+                layerName: layer.name,
+                path: n,
+                expression: p.expression,
+                enabled: p.expressionEnabled ?? true,
+                ...(p.expressionError ? { error: p.expressionError } : {}),
+              });
+            }
+          }
+        };
+        comp.layers.forEach((l, i) => walk(l, i + 1, l.children, [], []));
+        return { entries, truncated: false };
+      }, "findAllExpressions"),
 
     getCompSchema: () =>
       delay(

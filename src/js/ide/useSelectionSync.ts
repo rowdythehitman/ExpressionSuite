@@ -49,6 +49,7 @@ export function useSelectionSync(): void {
           lastChange = Date.now();
           await useIde.getState().setTree(await bridge.getCompTree(TREE_DEPTH));
           useIde.getState().setSchema(await bridge.getCompSchema());
+          void useIde.getState().refreshProblems();
         }
         // The playhead moved (or the tree changed): re-read the value strip. Scrubbing counts as activity.
         if (time !== lastTime || treeChanged) {

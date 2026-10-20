@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EditorArea } from "./editor/EditorArea";
 import { Explorer } from "./tree/Explorer";
+import { Problems } from "./Problems";
 import { StatusBar } from "./StatusBar";
 import { useSelectionSync } from "./useSelectionSync";
 
@@ -78,7 +79,10 @@ export function App() {
             ›
           </button>
         )}
-        <EditorArea />
+        <div className="workspace">
+          <EditorArea />
+          <Problems />
+        </div>
       </div>
       <StatusBar />
     </div>

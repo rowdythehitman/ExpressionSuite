@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { type Bridge, BridgeError, type CompSchema, type CompTree, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
+import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
 import { checkSyntax } from "./editor/syntax";
@@ -32,6 +32,9 @@ export interface Status {
 
 export interface IdeState {
   tree: CompTree | null;
+  /** Every expression in the comp, from the last scan (spec: Problems list). Null until scanned. */
+  problems: ExpressionScan | null;
+  problemsOpen: boolean;
   /** The active tab's evaluated value at the playhead (spec: Value strip). */
   reading: { key: string; reading: ValueReading } | null;
   /** Layer, effect and parameter names of the active comp, for completions. */
@@ -54,6 +57,11 @@ export interface IdeState {
 
   setTree(tree: CompTree | null): Promise<void>;
   setSchema(schema: CompSchema | null): void;
+  setProblemsOpen(open: boolean): void;
+  /** Rescans the comp's expressions; a no-op while the Problems panel is closed, unless forced. */
+  refreshProblems(force?: boolean): Promise<void>;
+  /** Expands the tree down to `key`, loading groups as needed, and selects it. */
+  revealInTree(key: string): Promise<void>;
   /** Re-reads the active tab's value; called on tab change, after apply and when the playhead moves. */
   refreshValue(): Promise<void>;
   toggle(key: string): Promise<void>;
@@ -237,6 +245,8 @@ export const useIde = create<IdeState>((set, get) => {
     tree: null,
     schema: null,
     reading: null,
+    problems: null,
+    problemsOpen: false,
     loaded: {},
     expanded: {},
     loading: {},
@@ -294,6 +304,27 @@ export const useIde = create<IdeState>((set, get) => {
     },
 
     setSchema: (schema) => set({ schema }),
+
+    setProblemsOpen(open) {
+      set({ problemsOpen: open });
+      if (open) void get().refreshProblems();
+    },
+
+    async refreshProblems(force = false) {
+      if (!get().problemsOpen && !force) return;
+      try {
+        set({ problems: await bridge().findAllExpressions() });
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+      }
+    },
+
+    async revealInTree(key) {
+      const expanded = { ...get().expanded };
+      for (const k of ancestors(key)) expanded[k] = true;
+      set({ expanded, selectedKey: key, filter: "", onlyExpressions: false });
+      await loadExpanded();
+    },
 
     async refreshValue() {
       const key = get().activeTab;
@@ -410,6 +441,7 @@ export const useIde = create<IdeState>((set, get) => {
             : { kind: "ok", text: code === "" ? `Removed expression: ${label}` : `${auto ? "Auto-applied" : "Applied"}: ${label}` },
         });
         if (get().activeTab === key) get().refreshValue();
+        void get().refreshProblems();
       } catch (e) {
         set({ status: { kind: "error", text: `${label}: ${errorText(e)}` } });
       }
@@ -473,6 +505,7 @@ export const useIde = create<IdeState>((set, get) => {
         tree: null,
         schema: null,
         reading: null,
+        problems: null,
         loaded: {},
         expanded: {},
         loading: {},
