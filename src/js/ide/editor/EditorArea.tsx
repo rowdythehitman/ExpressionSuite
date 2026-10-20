@@ -190,8 +190,10 @@ function Breadcrumb({ tabKey }: { tabKey: string }) {
   // Fill in the layer name even when the layer row was collapsed.
   const p = parseKey(tabKey);
   if (p && parts[0]) parts[0].name = findNode(state, layerKey(p.compId, p.layerId))?.name ?? parts[0].name;
+  const tab = state.tabs.find((t) => t.key === tabKey);
   return (
     <div className="breadcrumb">
+      <FileLink tab={tab} />
       <span>{state.tree?.comp.name ?? "Comp"}</span>
       {parts.map((part) => (
         <span key={part.key}>
@@ -202,6 +204,28 @@ function Breadcrumb({ tabKey }: { tabKey: string }) {
         </span>
       ))}
     </div>
+  );
+}
+
+/** Link the tab to a .js file to edit it in another editor; shows the file once linked. */
+function FileLink({ tab }: { tab?: Tab }) {
+  if (!tab) return null;
+  const { linkFile, unlinkFile } = useIde.getState();
+  if (!tab.linkedFile) {
+    return (
+      <button className="file-link" onClick={() => linkFile(tab.key)} title="Link this tab to a .js file: edit it in VS Code, and every save applies it here">
+        Link file…
+      </button>
+    );
+  }
+  const name = tab.linkedFile.split(/[\\/]/).pop();
+  return (
+    <span className="file-link linked" title={tab.linkedFile}>
+      ⇄ {name}
+      <button aria-label="Unlink file" title="Stop following the file" onClick={() => unlinkFile(tab.key)}>
+        ×
+      </button>
+    </span>
   );
 }
 

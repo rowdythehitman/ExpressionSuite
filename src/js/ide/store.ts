@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getFiles, suggestFileName } from "../bridge/files";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
@@ -26,6 +27,8 @@ export interface Tab {
   /** AE's expression when it changed in After Effects while this tab had unapplied edits (spec: external change
    * detection). The tab shows a banner and a diff until the user picks a version. */
   external?: string;
+  /** A .js file this tab is linked to: saving the file applies it; applying here writes it (spec: File watch mode). */
+  linkedFile?: string;
 }
 
 export interface RenameOffer {
@@ -100,7 +103,8 @@ export interface IdeState {
   closeSplit(): void;
   setActiveTab(key: string): void;
   updateCode(key: string, code: string): void;
-  apply(key: string, auto?: boolean): Promise<void>;
+  /** `fromFile`: the apply came from a save of the linked file (labelled so, and not written back). */
+  apply(key: string, auto?: boolean, fromFile?: boolean): Promise<void>;
   setAutoApply(on: boolean): void;
   /** Re-reads every open tab's expression from AE: clean tabs follow it, edited ones get a conflict to resolve. */
   syncTabs(): Promise<void>;
@@ -115,6 +119,9 @@ export interface IdeState {
   applyAll(): Promise<void>;
   /** Applies the tab's code to the same property on every layer selected in the timeline, as one undo step. */
   applyToSelected(key: string): Promise<void>;
+  /** Links the tab to a .js file chosen in a save dialog, then applies on every save of that file. */
+  linkFile(key: string): Promise<void>;
+  unlinkFile(key: string): void;
   setStatus(status: Status | null): void;
   /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
   reset(status?: Status | null): void;
@@ -167,6 +174,17 @@ function cancelAutoApply(key?: string): void {
     if (key === undefined || k === key) {
       clearTimeout(t);
       autoTimers.delete(k);
+    }
+  }
+}
+
+// Watchers for linked files, by tab key.
+const fileWatches = new Map<string, () => void>();
+function unwatch(key?: string): void {
+  for (const [k, stop] of fileWatches) {
+    if (key === undefined || k === key) {
+      stop();
+      fileWatches.delete(k);
     }
   }
 }
@@ -552,6 +570,7 @@ export const useIde = create<IdeState>((set, get) => {
 
     closeTab(key) {
       cancelAutoApply(key);
+      unwatch(key);
       const tabs = get().tabs;
       const i = tabs.findIndex((t) => t.key === key);
       if (i < 0) return;
@@ -638,7 +657,7 @@ export const useIde = create<IdeState>((set, get) => {
       set({ autoApply: on });
     },
 
-    async apply(key, auto = false) {
+    async apply(key, auto = false, fromFile = false) {
       cancelAutoApply(key);
       const tab = get().tabs.find((t) => t.key === key);
       if (!tab) return;
@@ -651,13 +670,66 @@ export const useIde = create<IdeState>((set, get) => {
           ...replaceNode(get(), res.node),
           status: res.error
             ? { kind: "error", text: `${label}: ${parseAeError(res.error).summary}`, detail: res.error }
-            : { kind: "ok", text: code === "" ? `Removed expression: ${label}` : `${auto ? "Auto-applied" : "Applied"}: ${label}` },
+            : {
+                kind: "ok",
+                text: code === "" ? `Removed expression: ${label}` : `${fromFile ? "Applied from file" : auto ? "Auto-applied" : "Applied"}: ${label}`,
+              },
         });
+        // Keep a linked file in step with what's in AE.
+        if (tab.linkedFile && !fromFile) {
+          getFiles()
+            .write(tab.linkedFile, code)
+            .catch((e) => set({ status: { kind: "error", text: `Couldn't write ${tab.linkedFile}: ${errorText(e)}` } }));
+        }
         if (get().activeTab === key) get().refreshValue();
         void get().refreshProblems();
       } catch (e) {
         set({ status: { kind: "error", text: `${label}: ${errorText(e)}` } });
       }
+    },
+
+    async linkFile(key) {
+      const tab = get().tabs.find((t) => t.key === key);
+      if (!tab) return;
+      const files = getFiles();
+      const file = await files.choose(suggestFileName(tab.layerName, tab.propName));
+      if (!file) return;
+      const existing = await files.read(file);
+      let useFile = false;
+      if (existing !== null && existing !== tab.code) {
+        useFile = window.confirm(
+          `${files.displayName(file)} already has code.\n\nOK: load the file into the tab and apply it.\nCancel: replace the file with the tab's code.`,
+        );
+      }
+      try {
+        if (!useFile) await files.write(file, tab.code);
+      } catch (e) {
+        set({ status: { kind: "error", text: `Couldn't write ${file}: ${errorText(e)}` } });
+        return;
+      }
+      unwatch(key);
+      fileWatches.set(
+        key,
+        files.watch(file, (text) => {
+          const t = get().tabs.find((x) => x.key === key);
+          if (!t || text === t.code) return;
+          get().updateCode(key, text);
+          void get().apply(key, false, true);
+        }),
+      );
+      set({
+        tabs: get().tabs.map((t) => (t.key === key ? { ...t, linkedFile: file, preview: false } : t)),
+        status: { kind: "info", text: `Linked to ${file}. Saving the file applies it.` },
+      });
+      if (useFile && existing !== null) {
+        get().updateCode(key, existing);
+        await get().apply(key, false, true);
+      }
+    },
+
+    unlinkFile(key) {
+      unwatch(key);
+      set({ tabs: get().tabs.map((t) => (t.key === key ? { ...t, linkedFile: undefined } : t)) });
     },
 
     async applyToSelected(key) {
@@ -756,6 +828,7 @@ export const useIde = create<IdeState>((set, get) => {
     reset(status = null) {
       autoExpanded = [];
       cancelAutoApply();
+      unwatch();
       set({
         tree: null,
         schema: null,

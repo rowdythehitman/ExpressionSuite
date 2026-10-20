@@ -135,3 +135,25 @@ showed a better way. Newest at the bottom.
     `.effect("…")`, `("param")`, bare `effect("…")`, `thisLayer`) against the active comp's schema. Unknown names get a
     warning squiggle and block auto-apply. Dynamic references (variables, indices, other comps) aren't checked.
 
+## Phase 4: power features (without the node view)
+
+42. **External change detection** (from the spec's Apply section, built here because rename safety needs it): open
+    tabs are re-read with `getProperties` on tree changes and every third poll (about 1 s). If AE's expression equals
+    the tab's code, it's adopted silently (this covers an apply landing between reads). A clean tab follows AE. An
+    edited tab keeps its edits and gets `external`, a banner with a diff, and no auto-apply until resolved. "Keep mine"
+    makes AE's version the baseline, so the edits stay unapplied.
+43. **Renames are detected from the comp schema** (layers by id; effects by layer, position and matchName), so mask and
+    shape-group renames aren't covered. The offer appears only if references to the old name remain in open tabs or
+    in the comp's applied expressions. If AE has already rewritten them itself, nothing is shown. "Update everywhere"
+    rewrites the comp's expressions in one undo group, then the open tabs. The rewrite walks the syntax tree, so only
+    `layer("…")` and `effect("…")` names in reference positions change, and comments and other strings don't.
+44. **One batch host call** (`setExpressions`, one undo group, per-item results) serves both batch apply and reference
+    updates. Batch targets are the active tab's matchName path on each selected layer. Layers without that property
+    are reported, not errors.
+45. **Linked files** go through `bridge/files.ts`: Node's fs in CEP, in-memory with `window.__mockFS` in the browser.
+    The file is watched with `fs.watchFile` (250 ms stat polling) rather than `fs.watch`, because editors that save by
+    replacing the file break `fs.watch`. A save applies straight away, whatever the auto-apply setting (that's the
+    point of the link). An apply in the panel writes the file back. Links last for the session only.
+46. **Linking to a file that already has different code** asks whether to load it into the tab (and apply), or
+    overwrite it with the tab's code.
+

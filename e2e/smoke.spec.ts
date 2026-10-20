@@ -317,3 +317,15 @@ test("apply to all selected layers", async ({ page }) => {
   await expect(page.getByTestId("status-message")).toHaveText("Applied Opacity to 2 layers.");
   expect(await page.evaluate(() => window.__mockAE!.getExpression("100:11:ADBE Transform Group/ADBE Opacity"))).toBe("50");
 });
+
+test("link a tab to a file; saving the file applies it", async ({ page }) => {
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await page.getByRole("button", { name: "Link file…" }).click();
+  await expect(page.locator(".file-link.linked")).toContainText("Title_Text - Scale.js");
+  await page.evaluate(() => window.__mockFS!.save("/mock/Title_Text - Scale.js", "[64, 64]"));
+  await expect(page.getByTestId("status-message")).toHaveText("Applied from file: Title_Text › Scale");
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("[64, 64]");
+  expect(await page.evaluate(() => window.__mockAE!.getExpression("100:13:ADBE Transform Group/ADBE Scale"))).toBe("[64, 64]");
+  await page.getByLabel("Unlink file").click();
+  await expect(page.getByRole("button", { name: "Link file…" })).toBeVisible();
+});

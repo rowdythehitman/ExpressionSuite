@@ -80,3 +80,18 @@ These items cover what only AE can answer. Tick each one off, or note what happe
 - [ ] Right-click a layer › Pin to top: it moves to the top with a ★, stays pinned after restarting AE, and is pinned
       in another comp with a layer of the same name.
 - [ ] ⫽ opens the tab on the right. Ctrl+S in the right-hand editor applies that property, not the active tab.
+
+## Phase 4
+
+- [ ] Edit an expression in the timeline while its tab is open with no edits: the tab updates within a second or so.
+- [ ] Same, but with unapplied edits in the tab: the banner appears. Compare shows both versions, and each button does
+      what it says.
+- [ ] Rename CTRLS (with expressions referencing it). **Does AE itself update the references?** Either way, the banner
+      should appear only for references still using the old name, and "Update everywhere" fixes them in one undo
+      step.
+- [ ] Rename an effect (Speed → Pace): same as above.
+- [ ] Select three layers, open one's Opacity, and click **Apply to 3 selected layers**: all three get it, and one
+      Undo reverts all three.
+- [ ] **Link file…** opens a save dialog. Open that file in VS Code and save a change: AE applies it within about a
+      second. Applying in the panel updates the file.
+- [ ] A link survives VS Code's save (including "save as", which replaces the file).

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureComp } from "../src/js/bridge/fixture";
 import { createMockBridge, type MockControl } from "../src/js/bridge/mock";
 import type { Bridge } from "../src/js/bridge/types";
+import { getFiles, suggestFileName } from "../src/js/bridge/files";
 import { AUTO_APPLY_MS, batchTargets, canAutoApply, findNode, isDirty, referenceFor, setStoreBridge, useIde } from "../src/js/ide/store";
 
 const TITLE = "100:13";
@@ -521,5 +522,53 @@ describe("batch apply", () => {
     // The camera has no Scale.
     expect(useIde.getState().status?.text).toBe("Applied Scale to 2 layers, 1 without Scale.");
     expect(isDirty(useIde.getState().tabs[0]!)).toBe(false);
+  });
+});
+
+describe("linked files", () => {
+  beforeEach(async () => {
+    getFiles(); // creates window.__mockFS
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().openProperty(SCALE, true);
+  });
+  afterEach(() => useIde.getState().unlinkFile(SCALE));
+
+  it("writes the tab to the file and applies every save of it", async () => {
+    window.__mockFS!.nextChoice("/work/scale.js");
+    await useIde.getState().linkFile(SCALE);
+    expect(useIde.getState().tabs[0]!.linkedFile).toBe("/work/scale.js");
+    expect(window.__mockFS!.read("/work/scale.js")).toBe("");
+
+    window.__mockFS!.save("/work/scale.js", "[25, 25]");
+    await vi.waitFor(() => expect(control.getExpression(SCALE)).toBe("[25, 25]"));
+    expect(useIde.getState().tabs[0]!.code).toBe("[25, 25]");
+    expect(useIde.getState().status?.text).toBe("Applied from file: Title_Text › Scale");
+
+    // Applying in the panel writes the file back.
+    useIde.getState().updateCode(SCALE, "[30, 30]");
+    await useIde.getState().apply(SCALE);
+    await vi.waitFor(() => expect(window.__mockFS!.read("/work/scale.js")).toBe("[30, 30]"));
+
+    useIde.getState().unlinkFile(SCALE);
+    window.__mockFS!.save("/work/scale.js", "[1, 1]");
+    await new Promise((r) => setTimeout(r, 30));
+    expect(control.getExpression(SCALE)).toBe("[30, 30]");
+  });
+
+  it("can start from an existing file's code", async () => {
+    window.__mockFS!.save("/work/existing.js", "value / 2");
+    window.__mockFS!.nextChoice("/work/existing.js");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await useIde.getState().linkFile(SCALE);
+    confirm.mockRestore();
+    expect(control.getExpression(SCALE)).toBe("value / 2");
+  });
+
+  it("does nothing when the dialog is cancelled; names files after the tab", async () => {
+    window.__mockFS!.nextChoice(null);
+    await useIde.getState().linkFile(SCALE);
+    expect(useIde.getState().tabs[0]!.linkedFile).toBeUndefined();
+    expect(suggestFileName("Title: Main", "Position")).toBe("Title_ Main - Position.js");
   });
 });

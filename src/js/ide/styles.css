@@ -345,6 +345,25 @@ button {
   text-overflow: ellipsis;
 }
 
+.file-link {
+  float: right;
+  margin-left: 12px;
+  color: var(--text-dim);
+}
+
+.file-link:hover {
+  color: var(--text);
+}
+
+.file-link.linked {
+  color: var(--ok);
+}
+
+.file-link.linked button {
+  padding: 0 4px;
+  color: var(--text-dim);
+}
+
 .breadcrumb .sep {
   padding: 0 4px;
 }

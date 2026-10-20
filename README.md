@@ -4,14 +4,14 @@ After Effects tools for working with expressions, shipped as one CEP extension w
 
 | Panel | Status | Spec |
 | --- | --- | --- |
-| **Expression IDE**: a VS Code-style editor for expressions | Phases 1–3 built; phase 3 needs an AE test pass | [`docs/SPEC-expression-ide.md`](docs/SPEC-expression-ide.md) |
+| **Expression IDE**: a VS Code-style editor for expressions | Phases 1–4 built (no node view); phase 4 needs an AE test pass | [`docs/SPEC-expression-ide.md`](docs/SPEC-expression-ide.md) |
 
 Choices made along the way are in [`docs/decisions.md`](docs/decisions.md). Behaviour that can only be checked
 inside After Effects is listed in [`docs/ae-verification.md`](docs/ae-verification.md).
 
 Targets **After Effects 2025 (25.0) and later** (CEP 12).
 
-## Expression IDE: what works now (phases 1–3)
+## Expression IDE: what works now (phases 1–4)
 
 - **Explorer:** the active comp's layers as folders. Groups are subfolders and expression-capable properties are files.
   Groups with nothing scriptable are hidden. Selected layers open automatically, with Transform and Effects expanded.
@@ -52,8 +52,17 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
   layer of that name.
 - **Split view:** ⫽ in the tab bar opens the active tab on the right, so two properties can be edited side by side.
 
-Next up (phase 4): rename-safe reference updates, batch apply across selected layers, linking a tab to a `.js` file
-for editing in VS Code, and an ExpressionLab node view.
+- **Stays in step with AE:** about once a second, open tabs re-read their expressions. A clean tab follows changes
+  made in AE. A tab with unapplied edits shows a banner instead: **Compare** (side-by-side diff), **Use After Effects'
+  version** or **Keep mine**. Auto-apply never applies over such a change.
+- **Rename-safe references:** after you rename a layer or effect, if any expression still uses the old name, a banner
+  offers **Update open tabs** or **Update everywhere** (every expression in the comp, one undo step).
+- **Batch apply:** with several layers selected, **Apply to N selected layers** in the tab bar sets the same property
+  on each of them, as one undo step.
+- **Linked files:** **Link file…** (right of the breadcrumb) writes the tab to a `.js` file. Edit it in VS Code and
+  every save applies it in AE; applying in the panel writes the file back.
+
+The spec's ExpressionLab node view is left out; ExpressionLab stays a separate project for now.
 
 ## Development
 
