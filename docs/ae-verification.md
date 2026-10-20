@@ -109,3 +109,10 @@ These items cover what only AE can answer. Tick each one off, or note what happe
       `thisComp.layer("CTRLS").effect("ADBE Slider Control")("ADBE Slider Control-0001")`, and it evaluates in AE.
 - [ ] Link a tab to a file in a **saved** project, then restart AE and reopen the project: the tab reopens, linked.
       Edit the file while AE is closed: it's loaded as an unapplied change.
+
+## 0.5.1 (drag rework)
+
+- [ ] A plain drag of any row into the code inserts its reference where you drop it, including into an empty editor.
+- [ ] Ctrl-drag (Cmd on Mac) adds `const ctrlsSpeed = …;` at the top and `ctrlsSpeed` at the drop point.
+- [ ] If a drop still inserts nothing, note the status-bar message: it says whether the drop arrived without data or
+      failed (with the error).

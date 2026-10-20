@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { camelCase, generateReference, type RefSegment, type RefTarget, suggestConstName } from "../src/js/ide/references/reference";
+import { camelCase, generateReference, type RefSegment, type RefTarget } from "../src/js/ide/references/reference";
 
 const seg = (name: string, matchName: string): RefSegment => ({ name, matchName });
 const TRANSFORM = seg("Transform", "ADBE Transform Group");
@@ -119,22 +119,7 @@ describe("reference strings (more)", () => {
   });
 });
 
-describe("const names for Alt-drop", () => {
-  it("names controls after the effect and other properties after themselves", () => {
-    expect(suggestConstName(target({ path: SPEED_SLIDER }), "")).toBe("speed");
-    expect(suggestConstName(target({ path: [EFFECTS, seg("Accent Colour", "ADBE Color Control"), seg("Color", "ADBE Color Control-0001")] }), "")).toBe(
-      "accentColour",
-    );
-    expect(suggestConstName(target({ path: [TRANSFORM, seg("Anchor Point", "ADBE Anchor Point")] }), "")).toBe("ctrlsAnchorPoint");
-    expect(suggestConstName(target({ path: [EFFECTS, seg("Drop Shadow", "ADBE Drop Shadow"), seg("Distance", "ADBE Drop Shadow-0004")] }), "")).toBe(
-      "distance",
-    );
-  });
-
-  it("numbers a name already declared", () => {
-    expect(suggestConstName(target({ path: SPEED_SLIDER }), "const speed = 1;\nlet speed2 = 2;")).toBe("speed3");
-  });
-
+describe("identifiers", () => {
   it("makes identifiers out of anything", () => {
     expect(camelCase("3D Point")).toBe("_3dPoint");
     expect(camelCase("Speed (fast)")).toBe("speedFast");

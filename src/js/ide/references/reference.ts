@@ -237,52 +237,10 @@ export function generateReference(target: RefTarget, ctx: RefContext): Reference
   return { code: compPart + layerPart + parts.join(""), ...(warning ? { warning } : {}) };
 }
 
-/** Expression controls whose single parameter is best named after the effect (`const speed = …`). */
-const CONTROL_EFFECTS = new Set([
-  "ADBE Slider Control",
-  "ADBE Angle Control",
-  "ADBE Checkbox Control",
-  "ADBE Color Control",
-  "ADBE Point Control",
-  "ADBE Point3D Control",
-  "ADBE Layer Control",
-  "ADBE Dropdown Control",
-]);
-
-/** Names that already mean something in an expression; a const with one of these names would shadow it. */
-const RESERVED = new Set(
-  (
-    "value time index name thisComp thisLayer thisProperty thisProject comp footage layer effect mask content text " +
-    "transform position scale rotation opacity anchorPoint orientation width height source parent marker " +
-    "wiggle loopIn loopOut linear ease easeIn easeOut clamp length add sub mul div random seedRandom " +
-    "valueAtTime numKeys inPoint outPoint startTime hasParent active enabled audioLevels timeRemap " +
-    "break case catch class const continue debugger default delete do else export extends finally for function " +
-    "if import in instanceof let new return super switch this throw try typeof var void while with yield"
-  ).split(" "),
-);
-
 export function camelCase(s: string): string {
   const words = s.replace(/[^A-Za-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
   // An all-caps first word (CTRLS) is lowered whole; otherwise just its first letter.
   const first = (w: string) => (w === w.toUpperCase() ? w.toLowerCase() : w.charAt(0).toLowerCase() + w.slice(1));
   const out = words.map((w, i) => (i === 0 ? first(w) : w.charAt(0).toUpperCase() + w.slice(1))).join("");
   return /^[0-9]/.test(out) ? `_${out}` : out || "ref";
-}
-
-/**
- * A `const` name for an Alt-drop: the effect name for expression controls (Speed › Slider → `speed`), otherwise the
- * property name, prefixed with the layer when it would shadow an AE name (`ctrlsPosition`), numbered when taken.
- */
-export function suggestConstName(target: RefTarget, code: string): string {
-  const leaf = target.path[target.path.length - 1];
-  const parent = target.path[target.path.length - 2];
-  let base: string;
-  if (!leaf) base = camelCase(target.layerName);
-  else if (parent && CONTROL_EFFECTS.has(parent.matchName)) base = camelCase(parent.name);
-  else base = camelCase(leaf.name);
-  if (RESERVED.has(base)) base = camelCase(`${target.layerName} ${base}`);
-  if (RESERVED.has(base)) base = `${base}Ref`;
-  const taken = (n: string) => new RegExp(`\\b(?:const|let|var)\\s+${n}\\b`).test(code);
-  if (!taken(base)) return base;
-  for (let n = 2; ; n++) if (!taken(`${base}${n}`)) return `${base}${n}`;
 }

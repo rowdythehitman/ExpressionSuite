@@ -142,22 +142,6 @@ test("text dropped from outside goes in as typed, never as a snippet", async ({ 
   await expect(page.locator(".monaco-editor .view-lines")).toContainText("a$0b ${1:x}");
 });
 
-test("Alt-drop declares a const at the top", async ({ page }) => {
-  await page.getByLabel("Auto-apply").uncheck();
-  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
-  await typeInEditor(page, "value");
-  await showSlider(page);
-  await row(page, SLIDER).hover();
-  await page.mouse.down();
-  await page.locator(".monaco-editor .view-lines").hover({ position: { x: 200, y: 8 } });
-  await page.keyboard.down("Alt");
-  await page.locator(".monaco-editor .view-lines").hover({ position: { x: 210, y: 8 } });
-  await page.mouse.up();
-  await page.keyboard.up("Alt");
-  const lines = page.locator(".monaco-editor .view-line");
-  await expect(lines.nth(0)).toContainText('const speed = thisComp.layer("CTRLS").effect("Speed")("Slider");');
-});
-
 test("right-click copies a reference; Ctrl+Shift+P picks from the timeline", async ({ page }) => {
   await showSlider(page);
   await row(page, SLIDER).click({ button: "right" });
@@ -330,15 +314,15 @@ test("link a tab to a file; saving the file applies it", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Link file…" })).toBeVisible();
 });
 
-async function dropWith(page: Page, key: string, modifier: "Alt" | "Control", x = 200, line = 1) {
+async function dropWith(page: Page, key: string, modifier: "Control" | null, x = 200, line = 1) {
   const y = 8 + (line - 1) * 19; // Monaco's default line height at 13px
   await row(page, key).hover();
   await page.mouse.down();
   await page.locator(".monaco-editor .view-lines").hover({ position: { x, y } });
-  await page.keyboard.down(modifier);
+  if (modifier) await page.keyboard.down(modifier);
   await page.locator(".monaco-editor .view-lines").hover({ position: { x: x + 4, y } });
   await page.mouse.up();
-  await page.keyboard.up(modifier);
+  if (modifier) await page.keyboard.up(modifier);
 }
 
 test("Ctrl-drop declares layer + property and uses it at the drop point", async ({ page }) => {
@@ -373,4 +357,19 @@ test("settings: theme follows AE or is chosen; font size applies", async ({ page
   await expect(page.locator(".monaco-editor .view-lines")).toHaveCSS("font-size", "18px");
   await page.reload();
   await expect(html).toHaveAttribute("data-theme", "dark"); // remembered
+});
+
+test("plain drop inserts the reference; Ctrl-drop into an empty editor declares and uses it", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "");
+  await showSlider(page);
+  await dropWith(page, SLIDER, null, 5);
+  await expect(page.locator(".monaco-editor .view-lines")).toHaveText('thisComp.layer("CTRLS").effect("Speed")("Slider")');
+
+  await typeInEditor(page, "");
+  await dropWith(page, SLIDER, "Control", 5);
+  const lines = page.locator(".monaco-editor .view-line");
+  await expect(lines.nth(0)).toHaveText('const ctrlsSpeed = thisComp.layer("CTRLS").effect("Speed")("Slider");');
+  await expect(lines.nth(1)).toHaveText("ctrlsSpeed");
 });

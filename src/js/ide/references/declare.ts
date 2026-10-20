@@ -1,5 +1,5 @@
-// Turning a dropped reference into a `const` (Alt-drop, Ctrl/Cmd-drop).
-import { camelCase, suggestConstName, type RefTarget } from "./reference";
+// Turning a dropped reference into a `const` (Ctrl/Cmd-drop).
+import { camelCase, type RefTarget } from "./reference";
 
 const CONTROLS = new Set([
   "ADBE Slider Control",
@@ -56,4 +56,3 @@ export function planDeclaration(code: string, refCode: string, name: string): De
   return { name, line: line + 1, text: `const ${name} = ${refCode};\n` };
 }
 
-export { suggestConstName };

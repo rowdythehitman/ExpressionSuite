@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { parentKey } from "../../../shared/keys";
 import { isDirty, referenceFor, useIde } from "../store";
-import { DRAG_MIME, setDraggingKey } from "../editor/insert";
+import { DRAG_MIME, endDrag, setDraggingKey } from "../editor/insert";
 import { SettingsMenu } from "../SettingsMenu";
 import { ContextMenu, type MenuAt } from "./ContextMenu";
 import { flatten, hasExpressionBelow, type Row } from "./flatten";
@@ -209,7 +209,7 @@ function TreeRow({ row, top, selected, active, timelineSelected, dot, onClick, o
       onContextMenu={onContextMenu}
       draggable
       onDragStart={(e) => onDragStart(e, node.key)}
-      onDragEnd={() => setDraggingKey(null)}
+      onDragEnd={endDrag}
       title={node.expressionError ?? (disabled ? "Expression disabled" : undefined)}
     >
       <span className="twisty">{isProp ? "" : row.loading ? "…" : open ? "▾" : "▸"}</span>

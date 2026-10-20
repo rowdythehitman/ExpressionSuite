@@ -174,4 +174,10 @@ showed a better way. Newest at the bottom.
 51. **Workers load lazily:** `getWorker` returns a Promise that imports the inline worker chunk on first use. The main
     chunk went from 11.5 MB to 4.3 MB (the 7 MB TypeScript worker loads when the editor first needs it), and the
     production build from about 2 minutes to about 1.
+52. **Two drops only:** plain inserts the reference, and Ctrl (Cmd on macOS, and only that key) declares a const named
+    after layer + property. Alt-drop (named after the property alone) is gone, as asked after 0.5.0. A drop never
+    fails silently: any error inserts the plain reference and reports it in the status bar, and a drop that arrives
+    without the dragged row says so. The dragged key is cleared 500 ms after `dragend` rather than at once, in case
+    `dragend` is reported before `drop`. When the const and the name land on the same spot (an empty editor), they
+    go in as one edit, because Monaco kept only one of two edits at the same point.
 

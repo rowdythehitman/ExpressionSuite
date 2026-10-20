@@ -3,7 +3,7 @@ import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { batchTargets, findNode, isDirty, namesContext, themeOf, referenceFor, refTargetFor, useIde, type Tab } from "../store";
-import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertText, setDraggingKey } from "./insert";
+import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertText, setDraggingKey, wantsDeclaration } from "./insert";
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
@@ -42,7 +42,7 @@ export function EditorArea() {
           <div className="empty editor-empty">
             <p>Select a property in the explorer to edit its expression.</p>
             <p className="hint">Click to preview, double-click to keep the tab open. Ctrl+S applies.</p>
-            <p className="hint">Drag properties from the explorer into the code. Alt-drop declares a const; Ctrl/Cmd-drop declares one named after the layer and uses it where you drop. Ctrl+Shift+P inserts the property selected in the timeline.</p>
+            <p className="hint">Drag properties from the explorer into the code for a reference; hold Ctrl (Cmd on Mac) while dropping to declare it as a const named after the layer and property. Ctrl+Shift+P inserts the property selected in the timeline.</p>
           </div>
         )}
       </div>
@@ -290,25 +290,32 @@ function CodeEditor({ tab }: { tab: Tab }) {
       (e) => {
         const key = getDraggingKey() ?? (e.dataTransfer?.getData(DRAG_MIME) || null);
         const text = e.dataTransfer?.getData("text/plain") ?? "";
-        if (!key && !text) return;
+        const state = useIde.getState();
+        if (!key && !text) {
+          // Tells us (and the user) when CEP delivers a drop without the dragged row.
+          state.setStatus({ kind: "info", text: "Nothing to insert from that drop. Try dragging the row again." });
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         setDraggingKey(null);
-        const state = useIde.getState();
-        const target = key ? refTargetFor(state, key) : null;
+        const at = pointAt(e);
         const ref = key ? referenceFor(state, key, keyRef.current) : null;
-        if (!target || !ref) {
-          if (text) insertText(editor, text, pointAt(e));
-          return;
-        }
-        if (e.altKey || e.ctrlKey || e.metaKey) {
-          // Alt: a const named after the property. Ctrl/Cmd: named after layer + property, and used at the drop point.
-          const mode = e.altKey ? "property" : "layer";
-          const { name, added } = insertDeclaration(editor, ref, target, mode, mode === "layer" ? pointAt(e) : undefined);
-          state.setStatus({ kind: "info", text: ref.warning ?? (added ? `Added const ${name}.` : `Using the existing const ${name}.`) });
-        } else {
-          insertReference(editor, ref, pointAt(e));
-          if (ref.warning) state.setStatus({ kind: "info", text: ref.warning });
+        const target = key ? refTargetFor(state, key) : null;
+        try {
+          if (!ref || !target) {
+            if (text) insertText(editor, text, at);
+          } else if (wantsDeclaration(e)) {
+            const { name, added } = insertDeclaration(editor, ref, target, at);
+            state.setStatus({ kind: "info", text: ref.warning ?? (added ? `Added const ${name}.` : `Using the existing const ${name}.`) });
+          } else {
+            insertReference(editor, ref, at);
+            if (ref.warning) state.setStatus({ kind: "info", text: ref.warning });
+          }
+        } catch (err) {
+          // Never lose a drop: fall back to the plain text and say what went wrong.
+          insertText(editor, ref?.code ?? text, at);
+          state.setStatus({ kind: "error", text: `Drop: ${(err as Error).message ?? err} (inserted the plain reference instead)` });
         }
       },
       true,

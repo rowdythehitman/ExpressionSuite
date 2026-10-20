@@ -47,3 +47,13 @@ describe("planDeclaration", () => {
     });
   });
 });
+
+describe("which drops declare", () => {
+  it("is Ctrl on Windows and Cmd on macOS, nothing else", async () => {
+    const { wantsDeclaration } = await import("../src/js/ide/editor/insert");
+    expect(wantsDeclaration({ ctrlKey: true, metaKey: false }, false)).toBe(true);
+    expect(wantsDeclaration({ ctrlKey: false, metaKey: true }, false)).toBe(false); // the Windows key
+    expect(wantsDeclaration({ ctrlKey: false, metaKey: true }, true)).toBe(true);
+    expect(wantsDeclaration({ ctrlKey: true, metaKey: false }, true)).toBe(false);
+  });
+});
