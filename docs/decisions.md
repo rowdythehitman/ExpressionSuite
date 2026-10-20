@@ -109,4 +109,7 @@ showed a better way. Newest at the bottom.
     script, and every `Layer` and `Property` member becomes a bare global (`time`, `wiggle`, `loopOut`, `linear`, …),
     plus `thisLayer`, `thisComp`, `thisProject` and `thisProperty`. `value` is declared per tab from the property's
     value type (number, `[x, y]`, `[x, y, z]`, colour, text, path).
+34. **The panel owns every drop into the editor.** Monaco's drop-into-editor inserted the dragged text as a snippet,
+    which in CEP left a literal `$0` after the reference. It's switched off. The dragged row's key is kept in memory
+    from `dragstart` (CEP's browser may drop the custom MIME type), and any other dropped text goes in as plain text.
 

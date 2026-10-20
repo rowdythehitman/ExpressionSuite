@@ -122,6 +122,24 @@ test("drag CTRLS › Speed › Slider into another layer's tab inserts a working
   await showSlider(page);
   await row(page, SLIDER).dragTo(page.locator(".monaco-editor .view-lines"), { targetPosition: { x: 300, y: 8 } });
   await expect(page.locator(".monaco-editor .view-lines")).toContainText('value * thisComp.layer("CTRLS").effect("Speed")("Slider")');
+  await expect(page.locator(".monaco-editor .view-lines")).not.toContainText("$0");
+});
+
+test("text dropped from outside goes in as typed, never as a snippet", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "");
+  // Only text/plain, as when CEP strips the explorer's own drag type and nothing is being dragged from the tree.
+  await page.evaluate(() => {
+    const el = document.querySelector(".monaco-editor .view-lines")!;
+    const r = el.getBoundingClientRect();
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "a$0b ${1:x}");
+    const at = { clientX: r.left + 20, clientY: r.top + 8, bubbles: true, cancelable: true, dataTransfer: dt };
+    el.dispatchEvent(new DragEvent("dragover", at));
+    el.dispatchEvent(new DragEvent("drop", at));
+  });
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("a$0b ${1:x}");
 });
 
 test("Alt-drop declares a const at the top", async ({ page }) => {

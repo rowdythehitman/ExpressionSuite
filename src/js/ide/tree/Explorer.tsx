@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { parentKey } from "../../../shared/keys";
 import { isDirty, referenceFor, useIde } from "../store";
-import { DRAG_MIME } from "../editor/insert";
+import { DRAG_MIME, setDraggingKey } from "../editor/insert";
 import { ContextMenu, type MenuAt } from "./ContextMenu";
 import { flatten, hasExpressionBelow, type Row } from "./flatten";
 
@@ -167,6 +167,7 @@ export function Explorer() {
 /** Drag carries the node key (the editor builds the reference relative to the tab it lands in) and, for other
  * targets, the reference as plain text. */
 function onDragStart(e: React.DragEvent, key: string) {
+  setDraggingKey(key);
   e.dataTransfer.setData(DRAG_MIME, key);
   const ref = referenceFor(useIde.getState(), key);
   if (ref) e.dataTransfer.setData("text/plain", ref.code);
@@ -205,6 +206,7 @@ function TreeRow({ row, top, selected, active, timelineSelected, dot, onClick, o
       onContextMenu={onContextMenu}
       draggable
       onDragStart={(e) => onDragStart(e, node.key)}
+      onDragEnd={() => setDraggingKey(null)}
       title={node.expressionError ?? (disabled ? "Expression disabled" : undefined)}
     >
       <span className="twisty">{isProp ? "" : row.loading ? "…" : open ? "▾" : "▸"}</span>

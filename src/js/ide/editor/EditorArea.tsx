@@ -3,7 +3,7 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { findNode, isDirty, referenceFor, refTargetFor, useIde, type Tab } from "../store";
-import { DRAG_MIME, insertConst, insertReference } from "./insert";
+import { DRAG_MIME, getDraggingKey, insertConst, insertReference, insertText, setDraggingKey } from "./insert";
 import { monaco, setValueType } from "./monaco";
 import { checkSyntax } from "./syntax";
 
@@ -140,25 +140,43 @@ function CodeEditor({ tab }: { tab: Tab }) {
       if (ref.warning) useIde.getState().setStatus({ kind: "info", text: ref.warning });
     });
 
-    // Drops from the explorer: the reference at the drop point, or with Alt a `const` on a new first line.
+    // Every drop goes through here; Monaco's own drop-into-editor is off (it inserts text as a snippet, which showed
+    // a literal `$0` in CEP). Explorer rows insert a reference at the drop point, or with Alt a `const` on line 1;
+    // other text is inserted as is.
     const dom = editor.getDomNode();
+    const pointAt = (e: DragEvent) => editor.getTargetAtClientPoint(e.clientX, e.clientY)?.position ?? undefined;
+    dom?.addEventListener(
+      "dragover",
+      (e) => {
+        if (!getDraggingKey() && !e.dataTransfer?.types.includes("text/plain")) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        const at = pointAt(e);
+        if (at) editor.setPosition(at); // the caret shows where the drop lands
+      },
+      true,
+    );
     dom?.addEventListener(
       "drop",
       (e) => {
-        const key = e.dataTransfer?.getData(DRAG_MIME);
-        if (!key) return;
+        const key = getDraggingKey() ?? (e.dataTransfer?.getData(DRAG_MIME) || null);
+        const text = e.dataTransfer?.getData("text/plain") ?? "";
+        if (!key && !text) return;
         e.preventDefault();
         e.stopPropagation();
+        setDraggingKey(null);
         const state = useIde.getState();
-        const target = refTargetFor(state, key);
-        const ref = referenceFor(state, key);
-        if (!target || !ref) return;
+        const target = key ? refTargetFor(state, key) : null;
+        const ref = key ? referenceFor(state, key) : null;
+        if (!target || !ref) {
+          if (text) insertText(editor, text, pointAt(e));
+          return;
+        }
         if (e.altKey) {
           const name = insertConst(editor, ref, target);
           state.setStatus({ kind: "info", text: ref.warning ?? `Added const ${name}.` });
         } else {
-          const at = editor.getTargetAtClientPoint(e.clientX, e.clientY)?.position ?? undefined;
-          insertReference(editor, ref, at);
+          insertReference(editor, ref, pointAt(e));
           if (ref.warning) state.setStatus({ kind: "info", text: ref.warning });
         }
       },
@@ -244,6 +262,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
           scrollBeyondLastLine: false,
           renderLineHighlight: "line",
           fixedOverflowWidgets: true,
+          dropIntoEditor: { enabled: false },
         }}
       />
     </div>
