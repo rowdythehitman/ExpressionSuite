@@ -66,6 +66,8 @@ export interface IdeState {
   settings: Settings;
   /** After Effects' panel background (for theme "ae"). */
   hostBackground: Rgb;
+  /** The saved project's path ("" while unsaved); linked files are remembered per project. */
+  projectPath: string;
   /** Pinned layer names, kept across sessions and comps (a CTRLS null is usually called the same everywhere). */
   pinned: string[];
   filter: string;
@@ -129,6 +131,8 @@ export interface IdeState {
   /** Links the tab to a .js file chosen in a save dialog, then applies on every save of that file. */
   linkFile(key: string): Promise<void>;
   unlinkFile(key: string): void;
+  /** The project's path changed (opened or saved): reopen the tabs linked to files in it last time. */
+  setProjectPath(path: string): Promise<void>;
   setStatus(status: Status | null): void;
   /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
   reset(status?: Status | null): void;
@@ -183,6 +187,35 @@ function cancelAutoApply(key?: string): void {
       autoTimers.delete(k);
     }
   }
+}
+
+// Linked files remembered between sessions: { [projectPath]: { [tabKey]: filePath } }. Only saved projects, since
+// keys (item and layer ids) are only stable within a project file.
+const LINKS_KEY = "expression-ide.links";
+type StoredLinks = Record<string, Record<string, string>>;
+function loadLinks(): StoredLinks {
+  try {
+    const v = JSON.parse(localStorage.getItem(LINKS_KEY) ?? "{}");
+    return v && typeof v === "object" ? (v as StoredLinks) : {};
+  } catch {
+    return {};
+  }
+}
+function storeLink(project: string, key: string, file: string | null): void {
+  if (!project) return;
+  const all = loadLinks();
+  const links = { ...(all[project] ?? {}) };
+  if (file) links[key] = file;
+  else delete links[key];
+  all[project] = links;
+  try {
+    localStorage.setItem(LINKS_KEY, JSON.stringify(all));
+  } catch {
+    // A convenience only.
+  }
+}
+export function storedLinks(project: string): Record<string, string> {
+  return project ? (loadLinks()[project] ?? {}) : {};
 }
 
 // Watchers for linked files, by tab key.
@@ -306,6 +339,42 @@ export const useIde = create<IdeState>((set, get) => {
     }
   }
 
+  function watchLinked(key: string, file: string): void {
+    unwatch(key);
+    fileWatches.set(
+      key,
+      getFiles().watch(file, (text) => {
+        const t = get().tabs.find((x) => x.key === key);
+        if (!t || text === t.code) return;
+        get().updateCode(key, text);
+        void get().apply(key, false, true);
+      }),
+    );
+  }
+
+  /** Re-links a reopened tab to the file it was linked to last session. A file edited meanwhile is loaded as an
+   * unapplied change (not auto-applied): the user decides with Ctrl+S. */
+  async function relink(key: string, file: string): Promise<void> {
+    const text = await getFiles().read(file);
+    if (text === null) {
+      storeLink(get().projectPath, key, null);
+      set({ status: { kind: "info", text: `The linked file ${file} is gone; the link was removed.` } });
+      return;
+    }
+    watchLinked(key, file);
+    const tab = get().tabs.find((t) => t.key === key);
+    const changed = !!tab && text !== tab.code;
+    set({
+      tabs: get().tabs.map((t) => (t.key === key ? { ...t, linkedFile: file, preview: false, ...(changed ? { code: text } : {}) } : t)),
+      status: {
+        kind: "info",
+        text: changed
+          ? `${getFiles().displayName(file)} changed since it was last applied: loaded into the tab. Ctrl+S applies it.`
+          : `Re-linked ${getFiles().displayName(file)}.`,
+      },
+    });
+  }
+
   /** Open tabs (in the schema's comp) whose code still uses old names, with the rewritten code. */
   function tabRenames(state: IdeState, renames: Rename[]): { key: string; code: string; count: number }[] {
     const schema = state.schema;
@@ -365,6 +434,7 @@ export const useIde = create<IdeState>((set, get) => {
     loading: {},
     mode: "selection",
     pinned: storedPinned(),
+    projectPath: "",
     settings: loadSettings(),
     hostBackground: { r: 35, g: 35, b: 35 },
     filter: "",
@@ -581,6 +651,8 @@ export const useIde = create<IdeState>((set, get) => {
       if (!pin && previewAt >= 0) next.splice(previewAt, 1, tab);
       else next.push(tab);
       set({ tabs: next, activeTab: key, ...replaceNode(get(), node) });
+      const file = storedLinks(get().projectPath)[key];
+      if (file) await relink(key, file);
     },
 
     pinTab: (key) => set({ tabs: get().tabs.map((t) => (t.key === key ? { ...t, preview: false } : t)) }),
@@ -724,16 +796,8 @@ export const useIde = create<IdeState>((set, get) => {
         set({ status: { kind: "error", text: `Couldn't write ${file}: ${errorText(e)}` } });
         return;
       }
-      unwatch(key);
-      fileWatches.set(
-        key,
-        files.watch(file, (text) => {
-          const t = get().tabs.find((x) => x.key === key);
-          if (!t || text === t.code) return;
-          get().updateCode(key, text);
-          void get().apply(key, false, true);
-        }),
-      );
+      watchLinked(key, file);
+      storeLink(get().projectPath, key, file);
       set({
         tabs: get().tabs.map((t) => (t.key === key ? { ...t, linkedFile: file, preview: false } : t)),
         status: { kind: "info", text: `Linked to ${file}. Saving the file applies it.` },
@@ -746,7 +810,22 @@ export const useIde = create<IdeState>((set, get) => {
 
     unlinkFile(key) {
       unwatch(key);
+      storeLink(get().projectPath, key, null);
       set({ tabs: get().tabs.map((t) => (t.key === key ? { ...t, linkedFile: undefined } : t)) });
+    },
+
+    async setProjectPath(path) {
+      if (path === get().projectPath) return;
+      // Saving an unsaved project: carry its links over to the new path.
+      const before = get().projectPath;
+      set({ projectPath: path });
+      if (!before && path) for (const t of get().tabs) if (t.linkedFile) storeLink(path, t.key, t.linkedFile);
+      const links = storedLinks(path);
+      for (const key of Object.keys(links)) {
+        if (get().tabs.some((t) => t.key === key)) continue;
+        await get().openProperty(key, true); // re-links it (see openProperty)
+        if (!get().tabs.some((t) => t.key === key)) storeLink(path, key, null); // the property is gone
+      }
     },
 
     async applyToSelected(key) {

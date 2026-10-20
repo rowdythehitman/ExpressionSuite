@@ -23,6 +23,8 @@ export interface MockControl {
   setTime(t: number): void;
   /** Set a property's value, as if keyframed or typed in AE. */
   setValue(key: string, value: unknown): void;
+  /** Pretend the project is saved at `path` ("" = unsaved). */
+  setProjectPath(path: string): void;
   /** Switch to a new project (File › New Project); defaults to a one-solid comp reusing the fixture's ids. */
   newProject(comp?: MockComp): void;
   /** Calls made, by function name. */
@@ -89,6 +91,7 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
   let comp = initialComp;
   let project = 0;
   let time = 0;
+  let projectPath = "/mock/Main.aep";
   let selected: number[] = [];
   let activeKey: string | null = null;
   let version = 0; // bumped on structural or expression edits made "in AE"
@@ -202,6 +205,7 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         () => ({
           project,
           time,
+          projectPath,
           hash: [comp.id, comp.name, selected.join(","), activeKey ?? "", version, comp.layers.map((l) => `${l.id}=${l.name}`).join(",")].join("|"),
         }),
         "getSelectionHash",
@@ -380,6 +384,9 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
       findProperty(key).expression = code;
       version++;
     },
+    setProjectPath(path) {
+      projectPath = path;
+    },
     setTime(t) {
       time = t;
     },
@@ -388,6 +395,7 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
     },
     newProject(next) {
       comp = next ?? emptyProjectComp();
+      projectPath = "";
       project++;
       selected = [];
       activeKey = null;

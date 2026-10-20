@@ -4,6 +4,7 @@ import { fixtureComp } from "../src/js/bridge/fixture";
 import { createMockBridge, type MockControl } from "../src/js/bridge/mock";
 import type { Bridge } from "../src/js/bridge/types";
 import { getFiles, suggestFileName } from "../src/js/bridge/files";
+import { storedLinks as storedLinksFor } from "../src/js/ide/store";
 import { AUTO_APPLY_MS, batchTargets, canAutoApply, findNode, isDirty, referenceFor, setStoreBridge, useIde } from "../src/js/ide/store";
 
 const TITLE = "100:13";
@@ -576,5 +577,40 @@ describe("linked files", () => {
     await useIde.getState().linkFile(SCALE);
     expect(useIde.getState().tabs[0]!.linkedFile).toBeUndefined();
     expect(suggestFileName("Title: Main", "Position")).toBe("Title_ Main - Position.js");
+  });
+});
+
+describe("linked files across sessions", () => {
+  afterEach(() => localStorage.removeItem("expression-ide.links"));
+
+  it("reopens and re-links tabs when the project is opened again", async () => {
+    getFiles();
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().setProjectPath("/work/Main.aep");
+    await useIde.getState().openProperty(SCALE, true);
+    window.__mockFS!.nextChoice("/work/session-scale.js");
+    await useIde.getState().linkFile(SCALE);
+    window.__mockFS!.save("/work/session-scale.js", "[10, 10]");
+    await vi.waitFor(() => expect(control.getExpression(SCALE)).toBe("[10, 10]"));
+
+    // "Restart": a fresh panel state; meanwhile the file was edited in VS Code.
+    useIde.getState().reset();
+    useIde.setState({ projectPath: "" });
+    window.__mockFS!.save("/work/session-scale.js", "[11, 11]");
+    await sync();
+    await useIde.getState().setProjectPath("/work/Main.aep");
+
+    const tab = useIde.getState().tabs.find((t) => t.key === SCALE)!;
+    expect(tab.linkedFile).toBe("/work/session-scale.js");
+    expect([tab.code, tab.original]).toEqual(["[11, 11]", "[10, 10]"]); // loaded, not applied
+    expect(control.getExpression(SCALE)).toBe("[10, 10]");
+    expect(useIde.getState().status?.text).toMatch(/changed since it was last applied/);
+
+    // And saves are followed again.
+    window.__mockFS!.save("/work/session-scale.js", "[12, 12]");
+    await vi.waitFor(() => expect(control.getExpression(SCALE)).toBe("[12, 12]"));
+    useIde.getState().unlinkFile(SCALE);
+    expect(storedLinksFor("/work/Main.aep")).toEqual({});
   });
 });

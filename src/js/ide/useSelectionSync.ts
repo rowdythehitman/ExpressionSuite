@@ -31,7 +31,7 @@ export function useSelectionSync(): void {
     async function tick() {
       if (document.hidden) return schedule(IDLE_MS);
       try {
-        const { project, hash, time } = await bridge.getSelectionHash();
+        const { project, hash, time, projectPath } = await bridge.getSelectionHash();
         const ide = useIde.getState();
         if (lastProject !== null && project !== lastProject) {
           // A new or different project: every open tab and cached node belonged to the old one.
@@ -52,6 +52,8 @@ export function useSelectionSync(): void {
           await useIde.getState().setSchema(await bridge.getCompSchema());
           void useIde.getState().refreshProblems();
         }
+        // Linked tabs from last session come back once the tree (and so layer names) is there.
+        if (projectPath !== useIde.getState().projectPath) void useIde.getState().setProjectPath(projectPath);
         // Open tabs follow changes made in AE (timeline edits, AE's own rename updates): on tree changes and every
         // third tick (about once a second).
         if (treeChanged || ++ticks % 3 === 0) void useIde.getState().syncTabs();

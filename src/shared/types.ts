@@ -62,6 +62,8 @@ export interface SelectionHash {
   project: number;
   /** The active comp's current time (the playhead), so the value strip can follow it without refetching the tree. */
   time: number;
+  /** The saved project's file path ("" while unsaved), for remembering things per project. */
+  projectPath: string;
   /** Changes when the comp, selection, active property or layer list changes. */
   hash: string;
 }

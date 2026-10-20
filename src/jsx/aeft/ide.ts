@@ -307,7 +307,8 @@ function layerSignature(layer: Layer): string {
 export const getSelectionHash = (): SelectionHash => {
   const project = checkProject();
   const comp = activeComp();
-  return { project: project, time: comp ? comp.time : 0, hash: selectionHash() };
+  const file = app.project.file;
+  return { project: project, time: comp ? comp.time : 0, projectPath: file ? file.fsName : "", hash: selectionHash() };
 };
 
 function selectionHash(): string {
