@@ -4,14 +4,14 @@ After Effects tools for working with expressions, shipped as one CEP extension w
 
 | Panel | Status | Spec |
 | --- | --- | --- |
-| **Expression IDE**: a VS Code-style editor for expressions | Phase 1 built; needs an AE test pass | [`docs/SPEC-expression-ide.md`](docs/SPEC-expression-ide.md) |
+| **Expression IDE**: a VS Code-style editor for expressions | Phases 1 and 2 built; phase 2 needs an AE test pass | [`docs/SPEC-expression-ide.md`](docs/SPEC-expression-ide.md) |
 
 Choices made along the way are in [`docs/decisions.md`](docs/decisions.md). Behaviour that can only be checked
 inside After Effects is listed in [`docs/ae-verification.md`](docs/ae-verification.md).
 
 Targets **After Effects 2025 (25.0) and later** (CEP 12).
 
-## Expression IDE: what works now (phase 1)
+## Expression IDE: what works now (phases 1 and 2)
 
 - **Explorer:** the active comp's layers as folders. Groups are subfolders and expression-capable properties are files.
   Groups with nothing scriptable are hidden. Selected layers open automatically, with Transform and Effects expanded.
@@ -31,8 +31,20 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
 - **Reset (↺)** closes all tabs, clears errors and reloads the tree. Opening or creating a project does the same
   automatically.
 
-The next phase brings referencing (drag from the tree, pick from the timeline, the reference generator), AE typings for
-completions, and error line mapping from real AE messages.
+- **Auto-apply** (toggle in the tab bar, on by default): 1 s after you stop typing, a changed tab whose code has no
+  syntax error is applied, just like Ctrl+S. Syntax errors squiggle as you type.
+- **References:** drag any row from the explorer into the code to insert a reference such as
+  `thisComp.layer("CTRLS").effect("Speed")("Slider")`. Hold **Alt** while dropping to add
+  `const speed = …;` on the first line instead. **Ctrl/Cmd+Shift+P** inserts a reference to the property selected in
+  AE's timeline. References follow AE's own forms: `transform.position` on the same layer,
+  `content("Rect 1").content("Fill 1").color`, `text.animator("Animator 1").property.position`, and `comp("…")` for
+  other comps. When two layers share a name, the layer is referenced by index, with a warning.
+- **Right-click** a row for Copy reference, Enable/Disable/Remove expression, and Reveal in timeline.
+- **Completions** for the AE expression API (`thisComp.`, `wiggle`, `loopOut`, `linear`, …), with `value` typed for the
+  open property.
+
+Next up (phase 3): completions for this comp's real layer, effect and parameter names, the value strip, split view,
+pinned layers and the Problems list.
 
 ## Development
 

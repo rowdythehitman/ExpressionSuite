@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { type Bridge, BridgeError, type CompTree, getBridge, type TreeNode } from "../bridge";
+import { type Bridge, BridgeError, type CompTree, getBridge, type TreeNode, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
 import { checkSyntax } from "./editor/syntax";
@@ -19,6 +19,8 @@ export interface Tab {
   preview: boolean;
   /** AE's error from the last apply or read. */
   error?: string;
+  /** Shapes `value` in completions. */
+  valueType?: ValueType;
 }
 
 export interface Status {
@@ -220,6 +222,7 @@ export const useIde = create<IdeState>((set, get) => {
       code: node.expression ?? "",
       preview: true,
       error: node.expressionError,
+      valueType: node.valueType,
     };
   }
 

@@ -4,6 +4,9 @@ import * as monaco from "monaco-editor";
 import { loader } from "@monaco-editor/react";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker.js?worker&inline";
 import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker.js?worker&inline";
+import aeDts from "expression-globals-typescript/dist/index.d.ts?raw";
+import { buildAeLib, contextLib } from "./typings";
+import type { ValueType } from "../../bridge";
 
 self.MonacoEnvironment = {
   getWorker(_id: string, label: string) {
@@ -23,6 +26,15 @@ monaco.typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
   noSyntaxValidation: true,
 });
+
+// AE's expression API as globals (thisComp, wiggle, loopOut, linear, …) for completions and hovers.
+monaco.typescript.javascriptDefaults.addExtraLib(buildAeLib(aeDts), "file:///typings/ae-expressions.d.ts");
+
+/** Types `value` for the property in the active tab; the same path replaces the previous one. */
+export function setValueType(valueType: ValueType | undefined): void {
+  monaco.typescript.javascriptDefaults.addExtraLib(contextLib(valueType), "file:///typings/ae-context.d.ts");
+}
+setValueType(undefined);
 
 monaco.editor.defineTheme("ae-dark", {
   base: "vs-dark",

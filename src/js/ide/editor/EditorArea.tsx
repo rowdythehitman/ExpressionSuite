@@ -4,7 +4,7 @@ import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { findNode, isDirty, referenceFor, refTargetFor, useIde, type Tab } from "../store";
 import { DRAG_MIME, insertConst, insertReference } from "./insert";
-import { monaco } from "./monaco";
+import { monaco, setValueType } from "./monaco";
 import { checkSyntax } from "./syntax";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
@@ -172,6 +172,8 @@ function CodeEditor({ tab }: { tab: Tab }) {
     const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
     if (model && model.getValue() !== tab.code) model.setValue(tab.code);
   }, [tab.key, tab.code]);
+
+  useEffect(() => setValueType(tab.valueType), [tab.valueType]);
 
   // Instant syntax squiggle (acorn), 200 ms after typing stops.
   useEffect(() => {

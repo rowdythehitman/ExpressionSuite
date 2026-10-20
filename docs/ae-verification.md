@@ -47,3 +47,22 @@ These items cover what only AE can answer. Tick each one off, or note what happe
 - [ ] These must **not** reset the editor: **Save**, **Save As**, **Undo/Redo**, deleting a project item, switching comps.
 - [ ] The ↺ button closes all tabs, clears errors and reloads the tree. With unapplied changes it asks first.
 - [ ] The × on a status message dismisses it.
+
+## Phase 2
+
+- [ ] Auto-apply: typing a valid expression applies it about 1 s after you stop. A broken one squiggles and isn't
+      applied. Unticking **Auto-apply** stops it, and the setting survives a restart of AE.
+- [ ] Auto-applies don't make AE feel sluggish while typing (each one is a separate undo step).
+- [ ] Dragging **CTRLS › Effects › Speed › Slider** into a tab on another layer inserts
+      `thisComp.layer("CTRLS").effect("Speed")("Slider")` where you drop it, and the expression works.
+- [ ] Alt while dropping adds `const speed = …;` on line 1. Check that Alt-drag doesn't trigger something in AE.
+- [ ] Select a property in the timeline, click into the editor, then **Ctrl+Shift+P** inserts its reference. AE doesn't
+      grab the shortcut.
+- [ ] Right-click › **Copy reference** puts the text on the clipboard (paste it somewhere to check).
+- [ ] Right-click › Disable / Enable / Remove expression each work and undo in one step. Reveal in timeline selects
+      the property.
+- [ ] References AE accepts as written: shape `content("Rect 1").content("Fill 1").color`, text animator
+      `text.animator("Animator 1").property.position`, camera `transform.pointOfInterest`, mask
+      `mask("Mask 1").maskPath`.
+- [ ] Completions: `thisComp.` lists `layer`, `numLayers` and so on; typing `wigg` offers `wiggle`. The first popup may take
+      a second.

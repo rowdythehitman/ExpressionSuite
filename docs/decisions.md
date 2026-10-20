@@ -83,3 +83,30 @@ showed a better way. Newest at the bottom.
 25. **Racing opens:** a double click fires several opens before AE answers. The store checks again after the fetch, so
     only one tab is created.
 
+## Phase 2: referencing and diagnostics
+
+26. **Auto-apply** (the spec's "Apply on pause") is **on by default**, as asked after the first AE run, with a tab-bar
+    toggle remembered per machine. It fires 1 s after the last keystroke, only for a changed, non-empty tab that acorn
+    parses. Emptying a field never auto-removes an expression; Ctrl+S still can. Each auto-apply is its own undo step.
+27. **One source of syntax errors:** acorn (`ecmaVersion: "latest"`, top-level `return` allowed), checked 200 ms after
+    typing stops. Monaco's TypeScript syntax diagnostics are off so errors aren't reported twice. The same check gates
+    auto-apply.
+28. **References are built in the panel** from the tree's loaded ancestry (`refTargetFor`), relative to the **active
+    tab's** layer: same layer → `transform.position` (or `thisLayer(…)` for generic chains), same comp →
+    `thisComp.layer("…")`, else `comp("…").layer("…")`. A drag carries the node key, so the reference is computed for
+    the tab it lands in. Pick-from-timeline gets the same `RefTarget` from the host (`getSelectedRef`).
+29. **Short forms** cover transform, camera and light options, masks, shape contents (the inner "Contents" group is
+    implied, as AE writes it), shape transform, text source/animators/selectors, time remap and audio levels. Anything
+    else is `("Name")`. A camera's anchor point is `pointOfInterest`.
+30. **Alt-drop** only declares the const on line 1, as the spec says, and doesn't also insert the name at the drop
+    point. Names: an expression control's single parameter takes the effect's name (`speed`); otherwise the property's
+    name, prefixed with the layer if it would shadow an AE name (`ctrlsAnchorPoint`), numbered if already declared.
+31. **Ctrl/Cmd+Shift+P** is taken from Monaco's command palette for pick-from-timeline (the spec's default). F1 still
+    opens the palette.
+32. **Copy** falls back to `execCommand("copy")`, since CEP serves the panel from `file://`, where the async clipboard
+    API may be refused.
+33. **AE typings** come from `expression-globals-typescript` (MIT, by Tim Haywood): its module is turned into an ambient
+    script, and every `Layer` and `Property` member becomes a bare global (`time`, `wiggle`, `loopOut`, `linear`, …),
+    plus `thisLayer`, `thisComp`, `thisProject` and `thisProperty`. `value` is declared per tab from the property's
+    value type (number, `[x, y]`, `[x, y, z]`, colour, text, path).
+

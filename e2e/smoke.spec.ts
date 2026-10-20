@@ -154,3 +154,19 @@ test("right-click copies a reference; Ctrl+Shift+P picks from the timeline", asy
   await page.keyboard.press(`${mod}+Shift+P`);
   await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("CTRLS").effect("Speed")("Slider")');
 });
+
+test("completions know the AE expression API", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "thisComp.");
+  // The TypeScript worker takes a moment to start; ask explicitly instead of waiting for the automatic popup.
+  const suggest = page.locator(".monaco-editor .suggest-widget.visible");
+  await expect(async () => {
+    await page.keyboard.press("Control+Space");
+    await expect(suggest).toContainText("numLayers", { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+  await page.keyboard.press("Escape");
+  await typeInEditor(page, "wigg");
+  await page.keyboard.press("Control+Space");
+  await expect(suggest).toContainText("wiggle");
+});
