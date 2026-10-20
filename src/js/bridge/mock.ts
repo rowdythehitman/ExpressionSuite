@@ -280,6 +280,32 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         return { time: t, value: typeof v === "number" || typeof v === "string" || Array.isArray(v) ? (v as number | number[] | string) : null };
       }, "getValueAtTime"),
 
+    readReferences: (_compId, layerId, paths) =>
+      delay(
+        () =>
+          paths.map((path) => {
+            if (path.comp && path.comp !== comp.name) return null;
+            const l = path.layer as { self?: true; name?: string; index?: number };
+            const layer = l.self
+              ? comp.layers.find((x) => x.id === layerId)
+              : typeof l.index === "number"
+                ? comp.layers[l.index - 1]
+                : comp.layers.find((x) => x.name === l.name);
+            let children = layer?.children;
+            let hit: MockProp | undefined;
+            for (const step of path.steps) {
+              const options = Array.isArray(step) ? step : [step];
+              hit = children?.find((c) => options.includes(c.name) || options.includes(c.matchName));
+              if (!hit) return null;
+              children = hit.children;
+            }
+            if (!hit || !isProperty(hit)) return null;
+            const v = hit.value;
+            return { time, value: typeof v === "number" || typeof v === "string" || Array.isArray(v) ? (v as number | number[] | string) : null };
+          }),
+        "readReferences",
+      ),
+
     findAllExpressions: () =>
       delay(() => {
         const entries: ExpressionScan["entries"] = [];

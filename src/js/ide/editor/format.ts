@@ -8,3 +8,13 @@ export function timecode(seconds: number, fps: number): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${Math.floor(totalSeconds / 3600)}:${pad(Math.floor(totalSeconds / 60) % 60)}:${pad(totalSeconds % 60)}:${pad(ff)}`;
 }
+
+const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
+
+/** A short, one-line rendering of a value for inline hints: `2.5`, `[960, 540]`, `"Hello"`. */
+export function formatValue(v: number | number[] | string | null): string {
+  if (v === null) return "";
+  if (typeof v === "number") return num(v);
+  if (typeof v === "string") return JSON.stringify(v.length > 40 ? `${v.slice(0, 40)}…` : v);
+  return `[${v.map(num).join(", ")}]`;
+}

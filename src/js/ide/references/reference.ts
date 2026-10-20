@@ -22,7 +22,7 @@ export interface Reference {
 
 type Names = Record<string, string>;
 
-const TRANSFORM: Names = {
+export const TRANSFORM: Names = {
   "ADBE Anchor Point": "anchorPoint",
   "ADBE Position": "position",
   "ADBE Position_0": "xPosition",
@@ -36,14 +36,14 @@ const TRANSFORM: Names = {
   "ADBE Opacity": "opacity",
 };
 
-const MASK: Names = {
+export const MASK: Names = {
   "ADBE Mask Shape": "maskPath",
   "ADBE Mask Feather": "maskFeather",
   "ADBE Mask Opacity": "maskOpacity",
   "ADBE Mask Offset": "maskExpansion",
 };
 
-const SHAPE_TRANSFORM: Names = {
+export const SHAPE_TRANSFORM: Names = {
   "ADBE Vector Anchor": "anchorPoint",
   "ADBE Vector Position": "position",
   "ADBE Vector Scale": "scale",
@@ -53,7 +53,7 @@ const SHAPE_TRANSFORM: Names = {
   "ADBE Vector Group Opacity": "opacity",
 };
 
-const SHAPE_PROPS: Names = {
+export const SHAPE_PROPS: Names = {
   "ADBE Vector Rect Size": "size",
   "ADBE Vector Rect Position": "position",
   "ADBE Vector Rect Roundness": "roundness",
@@ -70,7 +70,7 @@ const SHAPE_PROPS: Names = {
   "ADBE Vector Trim Offset": "offset",
 };
 
-const TEXT_ANIMATOR_PROPS: Names = {
+export const TEXT_ANIMATOR_PROPS: Names = {
   "ADBE Text Anchor Point 3D": "anchorPoint",
   "ADBE Text Position 3D": "position",
   "ADBE Text Scale 3D": "scale",
@@ -89,13 +89,13 @@ const TEXT_ANIMATOR_PROPS: Names = {
   "ADBE Text Blur": "blur",
 };
 
-const TEXT_SELECTOR: Names = {
+export const TEXT_SELECTOR: Names = {
   "ADBE Text Percent Start": "start",
   "ADBE Text Percent End": "end",
   "ADBE Text Percent Offset": "offset",
 };
 
-const CAMERA: Names = {
+export const CAMERA: Names = {
   "ADBE Camera Zoom": "zoom",
   "ADBE Camera Depth of Field": "depthOfField",
   "ADBE Camera Focus Distance": "focusDistance",
@@ -103,7 +103,7 @@ const CAMERA: Names = {
   "ADBE Camera Blur Level": "blurLevel",
 };
 
-const LIGHT: Names = {
+export const LIGHT: Names = {
   "ADBE Light Intensity": "intensity",
   "ADBE Light Color": "color",
   "ADBE Light Cone Angle": "coneAngle",

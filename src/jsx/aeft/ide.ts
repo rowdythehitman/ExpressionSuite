@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, BatchResult, CompSchema, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+import type { ApplyResult, BatchResult, CompSchema, RefPath, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -520,21 +520,64 @@ export const getCompSchema = (): CompSchema | null => {
   return { compId: comp.id, compName: comp.name, layers: layers };
 };
 
-export const getValueAtTime = (key: string, time?: number): ValueReading => {
-  const r = resolveProperty(key);
-  const t = typeof time === "number" ? time : r.comp.time;
-  let v: any;
+/** A value AE can send over JSON: numbers, arrays, Source Text as text, paths as a summary; else null. */
+function serialise(prop: Property, v: any): number | number[] | string | null {
+  if (typeof v === "number" || typeof v === "string") return v;
+  if (v instanceof Array) return v;
+  if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT && v) return String(v.text);
+  if (prop.propertyValueType === PropertyValueType.SHAPE && v) return "Path (" + v.vertices.length + " points" + (v.closed ? ", closed" : "") + ")";
+  return null;
+}
+
+function readAt(prop: Property, t: number): ValueReading {
   try {
-    v = r.prop.valueAtTime(t, false);
+    return { time: t, value: serialise(prop, prop.valueAtTime(t, false)) };
   } catch (e) {
     return { time: t, value: null, error: String((e as any).message || e) };
   }
-  let value: number | number[] | string | null = null;
-  if (typeof v === "number" || typeof v === "string") value = v;
-  else if (v instanceof Array) value = v;
-  else if (r.prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT && v) value = String(v.text);
-  else if (r.prop.propertyValueType === PropertyValueType.SHAPE && v) value = "Path (" + v.vertices.length + " points" + (v.closed ? ", closed" : "") + ")";
-  return { time: t, value: value };
+}
+
+export const getValueAtTime = (key: string, time?: number): ValueReading => {
+  const r = resolveProperty(key);
+  return readAt(r.prop, typeof time === "number" ? time : r.comp.time);
+};
+
+/** Values of references written in code (see src/js/ide/references/resolve.ts), at the comp's current time. Null
+ * for any that don't resolve (a typo, a layer that isn't there). */
+export const readReferences = (compId: number, layerId: number, paths: RefPath[]): (ValueReading | null)[] => {
+  const home = compById(compId);
+  const out: (ValueReading | null)[] = [];
+  for (let i = 0; i < paths.length; i++) {
+    const path = paths[i] as RefPath;
+    try {
+      let comp: CompItem = home;
+      if (path.comp) {
+        let found: CompItem | null = null;
+        for (let j = 1; j <= app.project.numItems && !found; j++) {
+          const item = app.project.item(j);
+          if (item instanceof CompItem && item.name === path.comp) found = item;
+        }
+        if (!found) {
+          out.push(null);
+          continue;
+        }
+        comp = found;
+      }
+      const l: any = path.layer;
+      let cur: any = l.self ? app.project.layerByID(layerId) : typeof l.index === "number" ? comp.layer(l.index) : comp.layer(l.name);
+      for (let s = 0; s < path.steps.length && cur; s++) {
+        const step: any = path.steps[s];
+        const options: string[] = step instanceof Array ? step : [step];
+        let next: any = null;
+        for (let k = 0; k < options.length && !next; k++) next = cur.property(options[k]);
+        cur = next;
+      }
+      out.push(cur && cur.propertyType === PropertyType.PROPERTY ? readAt(cur as Property, comp.time) : null);
+    } catch (_e) {
+      out.push(null);
+    }
+  }
+  return out;
 };
 
 /** How many properties findAllExpressions visits before giving up on a huge comp. */

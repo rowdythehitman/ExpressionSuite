@@ -392,3 +392,19 @@ test("history: compare an earlier version and restore it", async ({ page }) => {
   await expect(page.locator(".monaco-editor .view-lines")).toContainText("[10, 10]");
   await expect(page.locator(".tab-close.dirty")).toBeVisible(); // restored as an unapplied edit
 });
+
+test("inline values after declared references", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, 'const speed = thisComp.layer("CTRLS").effect("Speed")("Slider");\nconst p = transform.position;\nvalue');
+  const hints = page.locator(".monaco-editor .inline-value");
+  await expect(hints).toHaveCount(2);
+  await expect(hints.nth(0)).toHaveText("// = 2.5");
+  await expect(hints.nth(1)).toHaveText("// = [960, 540]");
+  // They follow AE: a new value shows after the playhead moves.
+  await page.evaluate(() => {
+    window.__mockAE!.setValue("100:11:ADBE Effect Parade/ADBE Slider Control/ADBE Slider Control-0001", 7);
+    window.__mockAE!.setTime(1);
+  });
+  await expect(hints.nth(0)).toHaveText("// = 7");
+});

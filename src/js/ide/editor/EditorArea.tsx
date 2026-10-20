@@ -7,6 +7,8 @@ import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertTe
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
+import { declaredReferences } from "../references/resolve";
+import { formatValue } from "./format";
 import { HistoryPanel } from "./HistoryPanel";
 import { ValueStrip } from "./ValueStrip";
 
@@ -247,8 +249,51 @@ function useTypingContext(tab: Tab): () => void {
   return apply;
 }
 
+/** Values of `const x = <reference>;` declarations, shown faintly at the end of their lines (`// = 2.5`). Refreshed
+ * as the code changes and when the playhead moves. */
+function useInlineValues(editor: Parameters<OnMount>[0] | null, tab: Tab): void {
+  const time = useIde((s) => s.reading?.reading.time);
+  const collection = useRef<ReturnType<Parameters<OnMount>[0]["createDecorationsCollection"]> | null>(null);
+  useEffect(() => {
+    if (!editor) return;
+    collection.current ??= editor.createDecorationsCollection();
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const declared = declaredReferences(tab.code);
+      const readings = declared.length ? await useIde.getState().readReferences(tab.key, declared.map((d) => d.path)) : [];
+      if (cancelled || !collection.current) return;
+      const model = editor.getModel();
+      if (!model) return;
+      collection.current.set(
+        declared.flatMap((d, i) => {
+          const r = readings[i];
+          const text = r?.error ? "⚠ error" : r ? formatValue(r.value) : "";
+          if (!text || d.line > model.getLineCount()) return [];
+          const col = model.getLineMaxColumn(d.line);
+          return [
+            {
+              range: { startLineNumber: d.line, startColumn: col, endLineNumber: d.line, endColumn: col },
+              options: {
+                description: "inline-value",
+                showIfCollapsed: true,
+                after: { content: `  // = ${text}`, inlineClassName: "inline-value", cursorStops: monaco.editor.InjectedTextCursorStops.None },
+              },
+            },
+          ];
+        }),
+      );
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [editor, tab.key, tab.code, time]);
+}
+
 function CodeEditor({ tab }: { tab: Tab }) {
   const { updateCode } = useIde.getState();
+  const [editorInstance, setEditorInstance] = useState<Parameters<OnMount>[0] | null>(null);
+  useInlineValues(editorInstance, tab);
   // The tab this editor shows now; commands and drops read it when they run, as the editor outlives tab switches.
   const keyRef = useRef(tab.key);
   const typingContext = useTypingContext(tab);
@@ -259,6 +304,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
   }, [tab.key, typingContext]);
 
   const onMount: OnMount = (editor) => {
+    setEditorInstance(editor);
     editor.onDidFocusEditorText(() => contextRef.current());
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       useIde.getState().apply(keyRef.current);

@@ -839,3 +839,10 @@ button {
   flex: 1;
   min-width: 0;
 }
+
+/* Inline values after `const x = <reference>;` */
+.inline-value {
+  color: var(--text-dim) !important;
+  font-style: italic;
+  opacity: 0.8;
+}

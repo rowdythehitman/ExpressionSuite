@@ -132,3 +132,12 @@ export interface ExpressionScan {
   /** The walk stopped early on a very large comp. */
   truncated: boolean;
 }
+
+/** A reference written in code, as a path the host follows with property() (built by references/resolve.ts). */
+export interface RefPath {
+  /** Another comp by name, or the expression's own comp. */
+  comp?: string;
+  layer: { self: true } | { name: string } | { index: number };
+  /** Names or matchNames; an array lists alternatives to try in order. */
+  steps: (string | string[])[];
+}

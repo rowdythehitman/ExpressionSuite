@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getFiles, suggestFileName } from "../bridge/files";
+import type { RefPath } from "../bridge";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
@@ -97,6 +98,8 @@ export interface IdeState {
   refreshProblems(force?: boolean): Promise<void>;
   /** Expands the tree down to `key`, loading groups as needed, and selects it. */
   revealInTree(key: string): Promise<void>;
+  /** Reads the values of references written in a tab's code (inline values). */
+  readReferences(tabKey: string, paths: RefPath[]): Promise<(ValueReading | null)[]>;
   /** Re-reads the active tab's value; called on tab change, after apply and when the playhead moves. */
   refreshValue(): Promise<void>;
   toggle(key: string): Promise<void>;
@@ -580,6 +583,16 @@ export const useIde = create<IdeState>((set, get) => {
       for (const k of ancestors(key)) expanded[k] = true;
       set({ expanded, selectedKey: key, filter: "", onlyExpressions: false });
       await loadExpanded();
+    },
+
+    async readReferences(tabKey, paths) {
+      const p = parseKey(tabKey);
+      if (!p || paths.length === 0) return [];
+      try {
+        return await bridge().readReferences(p.compId, p.layerId, paths);
+      } catch {
+        return paths.map(() => null);
+      }
     },
 
     async refreshValue() {
