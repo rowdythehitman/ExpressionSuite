@@ -1,6 +1,6 @@
-import type { ApplyResult, BatchResult, CompSchema, RefPath, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "../../shared/types";
+import type { ApplyResult, BatchResult, CompSchema, RefPath, ValueSamples, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "../../shared/types";
 
-export type { ApplyResult, BatchResult, CompInfo, RefPath, CompSchema, SchemaEffect, SchemaLayer, CompTree, ExpressionEntry, ExpressionScan, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+export type { ApplyResult, BatchResult, CompInfo, RefPath, ValueSamples, CompSchema, SchemaEffect, SchemaLayer, CompTree, ExpressionEntry, ExpressionScan, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** Everything the panels need from After Effects. The only implementations are cep.ts (real) and mock.ts. */
 export interface Bridge {
@@ -29,6 +29,8 @@ export interface Bridge {
   getValueAtTime(key: string, time?: number): Promise<ValueReading>;
   /** Values of references written in code, for showing them inline; null where one doesn't resolve. */
   readReferences(compId: number, layerId: number, paths: RefPath[]): Promise<(ValueReading | null)[]>;
+  /** The property's value at `count` times across the comp's work area (value graph). */
+  sampleValues(key: string, count: number): Promise<ValueSamples>;
   /** Every expression in the active comp, with AE's error for each (Problems list). */
   findAllExpressions(): Promise<ExpressionScan | null>;
 }

@@ -141,3 +141,12 @@ export interface RefPath {
   /** Names or matchNames; an array lists alternatives to try in order. */
   steps: (string | string[])[];
 }
+
+/** A property sampled across a time range, for the value graph. */
+export interface ValueSamples {
+  start: number;
+  end: number;
+  times: number[];
+  /** One per time; null where the value can't be graphed (text, paths) or failed. */
+  values: (number | number[] | null)[];
+}

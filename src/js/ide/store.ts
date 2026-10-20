@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getFiles, suggestFileName } from "../bridge/files";
-import type { RefPath } from "../bridge";
+import type { RefPath, ValueSamples } from "../bridge";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
@@ -98,6 +98,8 @@ export interface IdeState {
   refreshProblems(force?: boolean): Promise<void>;
   /** Expands the tree down to `key`, loading groups as needed, and selects it. */
   revealInTree(key: string): Promise<void>;
+  /** Samples a property across the work area (value graph); null if it can't be read. */
+  sampleValues(key: string): Promise<ValueSamples | null>;
   /** Reads the values of references written in a tab's code (inline values). */
   readReferences(tabKey: string, paths: RefPath[]): Promise<(ValueReading | null)[]>;
   /** Re-reads the active tab's value; called on tab change, after apply and when the playhead moves. */
@@ -583,6 +585,14 @@ export const useIde = create<IdeState>((set, get) => {
       for (const k of ancestors(key)) expanded[k] = true;
       set({ expanded, selectedKey: key, filter: "", onlyExpressions: false });
       await loadExpanded();
+    },
+
+    async sampleValues(key) {
+      try {
+        return await bridge().sampleValues(key, 200);
+      } catch {
+        return null;
+      }
     },
 
     async readReferences(tabKey, paths) {

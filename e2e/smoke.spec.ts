@@ -408,3 +408,14 @@ test("inline values after declared references", async ({ page }) => {
   });
   await expect(hints.nth(0)).toHaveText("// = 7");
 });
+
+test("value graph plots the property over the work area", async ({ page }) => {
+  await page.evaluate(() => window.__mockAE!.animate("100:13:ADBE Transform Group/ADBE Scale", (t) => [100 + t * 20, 100 - t * 10]));
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await page.getByRole("button", { name: "Graph" }).click();
+  const graph = page.getByTestId("value-graph");
+  await expect(graph.locator("path")).toHaveCount(2);
+  await expect(graph.locator(".graph-max")).toHaveText("200");
+  await expect(graph.locator(".graph-min")).toHaveText("50");
+  await expect(graph.locator(".graph-playhead")).toHaveCount(1);
+});

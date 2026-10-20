@@ -23,6 +23,8 @@ export interface MockControl {
   setTime(t: number): void;
   /** Set a property's value, as if keyframed or typed in AE. */
   setValue(key: string, value: unknown): void;
+  /** Makes a property's value change over time (seconds → value), for the value graph. */
+  animate(key: string, fn: (t: number) => unknown): void;
   /** Pretend the project is saved at `path` ("" = unsaved). */
   setProjectPath(path: string): void;
   /** Switch to a new project (File › New Project); defaults to a one-solid comp reusing the fixture's ids. */
@@ -92,6 +94,8 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
   let project = 0;
   let time = 0;
   let projectPath = "/mock/Main.aep";
+  const animations = new Map<string, (t: number) => unknown>();
+  const WORK_AREA = { start: 0, end: 5 };
   let selected: number[] = [];
   let activeKey: string | null = null;
   let version = 0; // bumped on structural or expression edits made "in AE"
@@ -276,9 +280,21 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         const t = at ?? time;
         // The mock doesn't run expressions: an erroring one reports its error, otherwise the static value.
         if (p.expression && p.expressionError && p.expressionEnabled !== false) return { time: t, value: null, error: p.expressionError };
-        const v = p.value;
+        const v = animations.get(key)?.(t) ?? p.value;
         return { time: t, value: typeof v === "number" || typeof v === "string" || Array.isArray(v) ? (v as number | number[] | string) : null };
       }, "getValueAtTime"),
+
+    sampleValues: (key, count) =>
+      delay(() => {
+        const p = findProperty(key);
+        const n = Math.max(2, Math.min(400, count));
+        const times = Array.from({ length: n }, (_, i) => WORK_AREA.start + ((WORK_AREA.end - WORK_AREA.start) * i) / (n - 1));
+        const values = times.map((t) => {
+          const v = animations.get(key)?.(t) ?? p.value;
+          return typeof v === "number" || Array.isArray(v) ? (v as number | number[]) : null;
+        });
+        return { start: WORK_AREA.start, end: WORK_AREA.end, times, values };
+      }, "sampleValues"),
 
     readReferences: (_compId, layerId, paths) =>
       delay(
@@ -409,6 +425,9 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
     setExpressionInAE(key, code) {
       findProperty(key).expression = code;
       version++;
+    },
+    animate(key, fn) {
+      animations.set(key, fn);
     },
     setProjectPath(path) {
       projectPath = path;

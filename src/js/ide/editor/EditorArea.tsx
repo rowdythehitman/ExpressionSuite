@@ -40,7 +40,7 @@ export function EditorArea() {
           <>
             <Breadcrumb tabKey={tab.key} onHistory={() => setHistoryOpen(!historyOpen)} />
             {historyOpen ? <HistoryPanel tab={tab} onClose={() => setHistoryOpen(false)} /> : <EditorWithConflict tab={tab} />}
-            <ValueStrip tabKey={tab.key} valueType={tab.valueType} />
+            <ValueStrip tabKey={tab.key} valueType={tab.valueType} original={tab.original} />
           </>
         ) : (
           <div className="empty editor-empty">

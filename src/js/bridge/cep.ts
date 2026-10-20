@@ -41,6 +41,7 @@ export function createCepBridge(): Bridge {
     getCompSchema: () => call("getCompSchema"),
     findAllExpressions: () => call("findAllExpressions"),
     readReferences: (compId, layerId, paths) => call("readReferences", compId, layerId, paths),
+    sampleValues: (key, count) => call("sampleValues", key, count),
     // ExtendScript can't take `undefined` through JSON; omit the argument instead.
     getValueAtTime: (key, time) => (time === undefined ? call("getValueAtTime", key) : call("getValueAtTime", key, time)),
   };

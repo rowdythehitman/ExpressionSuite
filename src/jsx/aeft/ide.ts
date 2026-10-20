@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, BatchResult, CompSchema, RefPath, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+import type { ApplyResult, BatchResult, CompSchema, RefPath, ValueSamples, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -620,4 +620,25 @@ export const findAllExpressions = (): ExpressionScan | null => {
     walk(layer, layer, [], []);
   }
   return { entries: entries, truncated: state.budget <= 0 };
+};
+
+export const sampleValues = (key: string, count: number): ValueSamples => {
+  const r = resolveProperty(key);
+  const start = r.comp.workAreaStart;
+  const end = start + r.comp.workAreaDuration;
+  const n = Math.max(2, Math.min(400, count));
+  const times: number[] = [];
+  const values: (number | number[] | null)[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = start + ((end - start) * i) / (n - 1);
+    times.push(t);
+    let v: any;
+    try {
+      v = r.prop.valueAtTime(t, false);
+    } catch (_e) {
+      v = null; // an expression error at this time: a gap in the graph
+    }
+    values.push(typeof v === "number" || v instanceof Array ? v : null);
+  }
+  return { start: start, end: end, times: times, values: values };
 };
