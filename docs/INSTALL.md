@@ -1,5 +1,11 @@
 # Installing Expression Suite
 
+**Quickest:** on GitHub open **Actions › ZXP**, click the latest green run, and download **expression-suite-zxp**
+from **Artifacts**. Unzip it and drag the `.zxp` into the ZXP/UXP Installer. Each run signs with a fresh certificate,
+so if the installer refuses to update over an earlier version, remove the old one in the installer first.
+
+The rest of this page signs the panel with **your own** certificate instead, so updates always install over each other.
+
 You need no Node, no clone of the repo and no admin rights: just one zip from GitHub, `ZXPSignCmd.exe` and the
 ZXP/UXP Installer. CI builds the panel folder, and you sign it with your own certificate.
 

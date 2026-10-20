@@ -1,11 +1,10 @@
 name: ZXP
-# Optional: builds a ZXP signed with a throwaway certificate on Windows (the signing tool has no Linux build).
-# The usual route is to sign CI's `expression-suite-panel` artifact with your own certificate (docs/INSTALL.md),
-# so this only runs when started by hand or on a version tag.
+# Builds a ready-to-install ZXP on Windows (the signing tool has no Linux build), signed with a certificate made
+# for the run. Download `expression-suite-zxp` from the run's artifacts. To sign with your own certificate instead,
+# use CI's `expression-suite-panel` artifact (docs/INSTALL.md).
 on:
   workflow_dispatch:
   push:
-    tags: ["v*"]
 
 permissions:
   contents: write
