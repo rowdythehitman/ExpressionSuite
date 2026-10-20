@@ -4,6 +4,7 @@ import { SOURCE_LABEL, type HistoryEntry } from "../history";
 import { themeOf, useIde, type Tab } from "../store";
 
 const EMPTY: HistoryEntry[] = [];
+const DIFF_OPTIONS = { readOnly: true, renderSideBySide: true, minimap: { enabled: false }, automaticLayout: true };
 
 function when(time: number): string {
   const d = new Date(time);
@@ -57,7 +58,7 @@ export function HistoryPanel({ tab, onClose }: { tab: Tab; onClose: () => void }
               modified={tab.code}
               language="javascript"
               theme={theme === "light" ? "ae-light" : "ae-dark"}
-              options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false }, automaticLayout: true }}
+              options={DIFF_OPTIONS}
             />
           </div>
         )}

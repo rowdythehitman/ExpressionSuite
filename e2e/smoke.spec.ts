@@ -424,12 +424,15 @@ test("make a slider from a number in the code", async ({ page }) => {
   await page.getByLabel("Auto-apply").uncheck();
   await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
   await typeInEditor(page, "wiggle(2, 50)");
-  await page.keyboard.press("ArrowLeft"); // cursor on 50
+  await page.keyboard.press("Escape"); // close any completion popup
+  // Select the 50 itself with the keyboard: End, before the ")", then two characters back.
+  await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
-  await page.keyboard.press("Shift+F10"); // the context menu, at the cursor
-  await page.getByRole("menuitem", { name: "Make control on this layer" }).click();
-  await expect(page.locator(".monaco-editor .view-lines")).toContainText('wiggle(2, effect("Wiggle Amplitude")("Slider"))');
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press(`${mod}+Alt+M`); // Make control on this layer
   await expect(page.getByTestId("status-message")).toHaveText("Added Slider Control “Wiggle Amplitude” on Title_Text.");
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('wiggle(2, effect("Wiggle Amplitude")("Slider"))');
   // The new effect shows up in the (already open) Effects group.
   await expect(page.locator('.row:has-text("Wiggle Amplitude")')).toBeVisible();
 });
@@ -475,4 +478,11 @@ test("quick fix: a misspelt layer name", async ({ page }) => {
   }).toPass({ timeout: 10_000 });
   await page.keyboard.press("Enter"); // the first (preferred) fix
   await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("CTRLS").transform.scale');
+});
+
+test("Make control is in the editor's context menu", async ({ page }) => {
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await page.locator(".monaco-editor .view-lines").click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Make control on this layer" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Make control on pinned layer" })).toBeVisible();
 });

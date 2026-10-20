@@ -434,7 +434,10 @@ export const useIde = create<IdeState>((set, get) => {
     const state = get();
     const p = parseKey(tabKey);
     const tree = state.tree;
-    if (!p || !tree || tree.comp.id !== p.compId) return null;
+    if (!p || !tree || tree.comp.id !== p.compId) {
+      set({ status: { kind: "info", text: "This tab's comp isn't the one shown in the explorer: open that comp, then try again." } });
+      return null;
+    }
     const layer = onPinned
       ? tree.layers.find((l) => state.pinned.includes(l.name))
       : tree.layers.find((l) => l.key === layerKey(p.compId, p.layerId));
@@ -916,7 +919,11 @@ export const useIde = create<IdeState>((set, get) => {
       const tabs = get().tabs.map((t) => {
         const node = nodes[keys.indexOf(t.key)];
         if (!node) return t;
-        containers = replaceNode(containers, node);
+        // Only touch the tree when something about the property changed (new containers re-render it).
+        const known = findNode(containers, t.key);
+        if (!known || known.expression !== node.expression || known.expressionEnabled !== node.expressionEnabled || known.expressionError !== node.expressionError) {
+          containers = replaceNode(containers, node);
+        }
         const ae = node.expression ?? "";
         const error = node.expressionError;
         if (ae === t.original) return t.error === error ? t : { ...t, error };
@@ -929,9 +936,13 @@ export const useIde = create<IdeState>((set, get) => {
         }
         return t.external === ae ? t : { ...t, external: ae };
       });
+      // Nothing changed: leave the state alone, so nothing re-renders (about once a second).
+      const tabsChanged = tabs.some((t, i) => t !== get().tabs[i]);
+      const treeChanged = containers.tree !== get().tree || containers.loaded !== get().loaded;
+      if (!tabsChanged && !treeChanged) return;
       set({
-        tabs,
-        ...containers,
+        ...(tabsChanged ? { tabs } : {}),
+        ...(treeChanged ? containers : {}),
         ...(updated.length ? { status: { kind: "info", text: `Updated from After Effects: ${updated.join(", ")}` } as Status } : {}),
       });
     },

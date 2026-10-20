@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
@@ -72,6 +72,8 @@ export function EditorArea() {
   );
 }
 
+const DIFF_OPTIONS = { readOnly: true, renderSideBySide: true, minimap: { enabled: false }, automaticLayout: true };
+
 /** The editor, or, when AE changed the expression under unapplied edits, a banner and an optional diff. */
 function EditorWithConflict({ tab }: { tab: Tab }) {
   const [comparing, setComparing] = useState(false);
@@ -97,7 +99,7 @@ function EditorWithConflict({ tab }: { tab: Tab }) {
             modified={tab.code}
             language="javascript"
             theme={theme === "light" ? "ae-light" : "ae-dark"}
-            options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false }, automaticLayout: true }}
+            options={DIFF_OPTIONS}
           />
         </div>
       ) : (
@@ -373,7 +375,13 @@ function CodeEditor({ tab }: { tab: Tab }) {
       editor.pushUndoStop();
       editor.focus();
     };
-    editor.addAction({ id: "expression-ide.make-control", label: "Make control on this layer", contextMenuGroupId: "1_modification", run: () => makeControl(false) });
+    editor.addAction({
+      id: "expression-ide.make-control",
+      label: "Make control on this layer",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyM],
+      contextMenuGroupId: "1_modification",
+      run: () => makeControl(false),
+    });
     editor.addAction({ id: "expression-ide.make-control-pinned", label: "Make control on pinned layer", contextMenuGroupId: "1_modification", run: () => makeControl(true) });
 
     // Go to definition: Ctrl/Cmd-click a reference, or F12 / the context menu with the cursor on one.
@@ -571,6 +579,22 @@ function CodeEditor({ tab }: { tab: Tab }) {
 
   const settings = useIde((s) => s.settings);
   const theme = useIde(themeOf) === "light" ? "ae-light" : "ae-dark";
+  // Stable between renders: a new options object makes Monaco re-apply them, which closes open menus and popups.
+  const options = useMemo(
+    () => ({
+      automaticLayout: true,
+      minimap: { enabled: false },
+      fontSize: settings.fontSize,
+      tabSize: settings.tabSize,
+      detectIndentation: false,
+      scrollBeyondLastLine: false,
+      renderLineHighlight: "line" as const,
+      fixedOverflowWidgets: true,
+      dropIntoEditor: { enabled: false },
+    }),
+    [settings.fontSize, settings.tabSize],
+  );
+  const onChange = useCallback((value: string | undefined) => updateCode(tab.key, value ?? ""), [tab.key, updateCode]);
   // Tab width lives on each model, so it's pushed to all of them.
   useEffect(() => {
     for (const m of monaco.editor.getModels()) if (m.uri.path.startsWith("/ide/")) m.updateOptions({ tabSize: settings.tabSize, indentSize: settings.tabSize });
@@ -585,18 +609,8 @@ function CodeEditor({ tab }: { tab: Tab }) {
         theme={theme}
         onMount={onMount}
         keepCurrentModel
-        onChange={(value) => updateCode(tab.key, value ?? "")}
-        options={{
-          automaticLayout: true,
-          minimap: { enabled: false },
-          fontSize: settings.fontSize,
-          tabSize: settings.tabSize,
-          detectIndentation: false,
-          scrollBeyondLastLine: false,
-          renderLineHighlight: "line",
-          fixedOverflowWidgets: true,
-          dropIntoEditor: { enabled: false },
-        }}
+        onChange={onChange}
+        options={options}
       />
     </div>
   );

@@ -5,8 +5,8 @@ import { csi, getAppBackgroundColor, initBolt } from "../lib/utils/bolt";
 // Keys the editor needs that AE would otherwise take while the panel has focus (Ctrl/Cmd+S saves the project).
 // Windows uses DOM key codes; macOS CEP uses virtual key codes.
 const KEYS = {
-  win: { S: 83, Z: 90, Y: 89, F: 70, H: 72, A: 65, C: 67, V: 86, X: 88, D: 68, P: 80, SLASH: 191 },
-  mac: { S: 1, Z: 6, Y: 16, F: 3, H: 4, A: 0, C: 8, V: 9, X: 7, D: 2, P: 35, SLASH: 44 },
+  win: { S: 83, Z: 90, Y: 89, F: 70, H: 72, A: 65, C: 67, V: 86, X: 88, D: 68, P: 80, M: 77, PERIOD: 190, SLASH: 191 },
+  mac: { S: 1, Z: 6, Y: 16, F: 3, H: 4, A: 0, C: 8, V: 9, X: 7, D: 2, P: 35, M: 46, PERIOD: 47, SLASH: 44 },
 };
 
 function registerEditorKeys(): void {

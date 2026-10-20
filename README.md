@@ -64,7 +64,7 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
   every save applies it in AE; applying in the panel writes the file back. Links are remembered per saved project:
   reopening the project reopens the linked tabs. A file edited in the meantime is loaded as an unapplied change.
 - **Make control:** right-click a number, `[x, y]`, `[x, y, z]` or `true/false` in the code › *Make control on this
-  layer* (or *on pinned layer*). It becomes a Slider, Point, 3D Point or Checkbox, named from where it sits
+  layer* (`Ctrl+Alt+M` / `Cmd+Alt+M`) (or *on pinned layer*). It becomes a Slider, Point, 3D Point or Checkbox, named from where it sits
   (`const speed = 5` → Speed, `wiggle(2, 50)` → Wiggle Amplitude), set to that value, and the code now references it.
 - **Snippets ▾** (tab bar): wiggle with sliders, inertial bounce, posterize time, text box (`sourceRectAtTime`),
   loops. Inserting one creates the controls it uses and wires them in.

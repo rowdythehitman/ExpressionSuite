@@ -207,4 +207,7 @@ showed a better way. Newest at the bottom.
     dimension wrappers, served by one Monaco code-action provider from a per-model registry the markers fill. AE's
     exact wording for missing layers and effects is matched loosely and needs confirming in AE 2025.
 59. **In mock mode the store is `window.__ide`**, for debugging in a browser. It isn't set inside CEP.
-
+60. **Editor options are memoised** (`useMemo` on font size and tab size). A new options object on every render made
+    Monaco re-run `updateOptions`, which could close an open context menu mid-click; `syncTabs` also skips its store
+    update when nothing changed, so the panel doesn't re-render every second. *Make control* has a shortcut
+    (`Ctrl/Cmd+Alt+M`) and reports why it did nothing instead of failing silently.
