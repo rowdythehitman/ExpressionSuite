@@ -22,6 +22,9 @@ export interface Tab {
   error?: string;
   /** Shapes `value` in completions. */
   valueType?: ValueType;
+  /** AE's expression when it changed in After Effects while this tab had unapplied edits (spec: external change
+   * detection). The tab shows a banner and a diff until the user picks a version. */
+  external?: string;
 }
 
 export interface Status {
@@ -85,6 +88,10 @@ export interface IdeState {
   updateCode(key: string, code: string): void;
   apply(key: string, auto?: boolean): Promise<void>;
   setAutoApply(on: boolean): void;
+  /** Re-reads every open tab's expression from AE: clean tabs follow it, edited ones get a conflict to resolve. */
+  syncTabs(): Promise<void>;
+  /** Settles a conflict: "ae" takes After Effects' version, "mine" keeps the tab's edits (to apply over AE's). */
+  resolveExternal(key: string, keep: "ae" | "mine"): void;
   /** Removes the expression (one undo step) and empties its open tab. */
   removeExpression(key: string): Promise<void>;
   setExpressionEnabled(key: string, on: boolean): Promise<void>;
@@ -130,6 +137,8 @@ export function namesContext(schema: CompSchema | null, key: string): [CompSchem
 export function canAutoApply(tab: Tab, schema: CompSchema | null = null): boolean {
   return (
     isDirty(tab) &&
+    tab.external === undefined && // never silently overwrite a change made in AE
+
     tab.code.trim() !== "" &&
     checkSyntax(tab.code) === null &&
     checkNames(tab.code, ...namesContext(schema, tab.key)).length === 0
@@ -480,6 +489,49 @@ export const useIde = create<IdeState>((set, get) => {
       );
     },
 
+    async syncTabs() {
+      const keys = get().tabs.map((t) => t.key);
+      if (keys.length === 0) return;
+      let nodes: (TreeNode | null)[];
+      try {
+        nodes = await bridge().getProperties(keys);
+      } catch {
+        return; // the poller reports AE being unreachable
+      }
+      const updated: string[] = [];
+      let containers: Pick<IdeState, "tree" | "loaded"> = get();
+      const tabs = get().tabs.map((t) => {
+        const node = nodes[keys.indexOf(t.key)];
+        if (!node) return t;
+        containers = replaceNode(containers, node);
+        const ae = node.expression ?? "";
+        const error = node.expressionError;
+        if (ae === t.original) return t.error === error ? t : { ...t, error };
+        // AE now holds exactly what the tab shows (e.g. an apply just landed): nothing to resolve.
+        if (ae === t.code) return { ...t, original: ae, error, external: undefined };
+        if (!isDirty(t)) {
+          updated.push(`${t.layerName} › ${t.propName}`);
+          return { ...t, code: ae, original: ae, error, external: undefined };
+        }
+        return t.external === ae ? t : { ...t, external: ae };
+      });
+      set({
+        tabs,
+        ...containers,
+        ...(updated.length ? { status: { kind: "info", text: `Updated from After Effects: ${updated.join(", ")}` } as Status } : {}),
+      });
+    },
+
+    resolveExternal(key, keep) {
+      set({
+        tabs: get().tabs.map((t) => {
+          if (t.key !== key || t.external === undefined) return t;
+          // Either way AE's version becomes the baseline; "mine" leaves the edits to apply over it.
+          return keep === "ae" ? { ...t, code: t.external, original: t.external, external: undefined } : { ...t, original: t.external, external: undefined };
+        }),
+      });
+    },
+
     setAutoApply(on) {
       try {
         localStorage.setItem(AUTO_APPLY_KEY, on ? "on" : "off");
@@ -499,7 +551,7 @@ export const useIde = create<IdeState>((set, get) => {
       try {
         const res = await bridge().setExpression(key, code);
         set({
-          tabs: get().tabs.map((t) => (t.key === key ? { ...t, original: code, error: res.error } : t)),
+          tabs: get().tabs.map((t) => (t.key === key ? { ...t, original: code, error: res.error, external: undefined } : t)),
           ...replaceNode(get(), res.node),
           status: res.error
             ? { kind: "error", text: `${label}: ${parseAeError(res.error).summary}`, detail: res.error }

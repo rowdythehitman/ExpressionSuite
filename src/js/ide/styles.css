@@ -610,3 +610,29 @@ button {
 .split-button:hover {
   color: var(--text);
 }
+
+.conflict {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: #4d3a12;
+  color: #f0d8a8;
+}
+
+.conflict span {
+  flex: 1;
+  min-width: 200px;
+}
+
+.conflict button {
+  padding: 1px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+}
+
+.conflict button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}

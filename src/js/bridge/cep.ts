@@ -34,6 +34,8 @@ export function createCepBridge(): Bridge {
     getProperty: (key) => call("getProperty", key),
     setExpression: (key, code) => call("setExpression", key, code),
     setExpressionEnabled: (key, on) => call("setExpressionEnabled", key, on),
+    setExpressions: (items, undoName) => call("setExpressions", items, undoName),
+    getProperties: (keys) => call("getProperties", keys),
     revealInTimeline: (key) => call("revealInTimeline", key),
     getSelectedRef: () => call("getSelectedRef"),
     getCompSchema: () => call("getCompSchema"),

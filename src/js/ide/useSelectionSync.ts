@@ -18,6 +18,7 @@ export function useSelectionSync(): void {
     let lastHash: string | null = null;
     let lastProject: number | null = null;
     let lastTime: number | null = null;
+    let ticks = 0;
     let lastNonce = useIde.getState().refreshNonce;
     let lastChange = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -51,6 +52,9 @@ export function useSelectionSync(): void {
           useIde.getState().setSchema(await bridge.getCompSchema());
           void useIde.getState().refreshProblems();
         }
+        // Open tabs follow changes made in AE (timeline edits, AE's own rename updates): on tree changes and every
+        // third tick (about once a second).
+        if (treeChanged || ++ticks % 3 === 0) void useIde.getState().syncTabs();
         // The playhead moved (or the tree changed): re-read the value strip. Scrubbing counts as activity.
         if (time !== lastTime || treeChanged) {
           if (time !== lastTime) lastChange = Date.now();

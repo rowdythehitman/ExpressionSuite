@@ -128,6 +128,17 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
     return prop;
   }
 
+  function assign(key: string, p: MockProp, code: string): ApplyResult {
+    const { layer } = find(key);
+    const at = { property: p.name, layerIndex: comp.layers.indexOf(layer) + 1, layerName: layer.name, compName: comp.name };
+    p.expression = code;
+    p.expressionError = code === "" ? undefined : mockEvaluate(code, at);
+    // Like AE: an erroring expression is switched off; a good apply switches it back on.
+    p.expressionEnabled = !p.expressionError;
+    const node = propertyNode(key, p);
+    return node.expressionError ? { node, error: node.expressionError } : { node };
+  }
+
   function propertyNode(key: string, p: MockProp): TreeNode {
     const node: TreeNode = {
       key,
@@ -217,15 +228,33 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
       delay((): ApplyResult => {
         const p = findProperty(key);
         undo.push(`Expression IDE: ${p.name}`);
-        p.expression = code;
-        const { layer } = find(key);
-        const at = { property: p.name, layerIndex: comp.layers.indexOf(layer) + 1, layerName: layer.name, compName: comp.name };
-        p.expressionError = code === "" ? undefined : mockEvaluate(code, at);
-        // Like AE: an erroring expression is switched off; a good apply switches it back on.
-        p.expressionEnabled = !p.expressionError;
-        const node = propertyNode(key, p);
-        return node.expressionError ? { node, error: node.expressionError } : { node };
+        return assign(key, p, code);
       }, "setExpression"),
+
+    setExpressions: (items, undoName) =>
+      delay(() => {
+        undo.push(undoName);
+        return items.map((item) => {
+          try {
+            return { key: item.key, result: assign(item.key, findProperty(item.key), item.code) };
+          } catch (e) {
+            return { key: item.key, error: (e as Error).message };
+          }
+        });
+      }, "setExpressions"),
+
+    getProperties: (keys) =>
+      delay(
+        () =>
+          keys.map((k) => {
+            try {
+              return propertyNode(k, findProperty(k));
+            } catch {
+              return null;
+            }
+          }),
+        "getProperties",
+      ),
 
     setExpressionEnabled: (key, on) =>
       delay(() => {

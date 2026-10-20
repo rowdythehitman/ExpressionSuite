@@ -408,3 +408,50 @@ describe("split view", () => {
     expect(referenceFor(useIde.getState(), ctrlsPos, "100:11:ADBE Transform Group/ADBE Scale")?.code).toBe("transform.position");
   });
 });
+
+describe("changes made in After Effects", () => {
+  beforeEach(async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().openProperty(POSITION, true);
+  });
+
+  it("a clean tab follows AE", async () => {
+    control.setExpressionInAE(POSITION, "[1, 1]");
+    await useIde.getState().syncTabs();
+    const t = useIde.getState().tabs[0]!;
+    expect([t.code, t.original, t.external]).toEqual(["[1, 1]", "[1, 1]", undefined]);
+    expect(useIde.getState().status?.text).toBe("Updated from After Effects: Title_Text › Position");
+  });
+
+  it("an edited tab gets a conflict; either version can win", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(POSITION, "[9, 9]");
+    control.setExpressionInAE(POSITION, "[1, 1]");
+    await ide.syncTabs();
+    expect(useIde.getState().tabs[0]!.external).toBe("[1, 1]");
+    ide.resolveExternal(POSITION, "mine");
+    let t = useIde.getState().tabs[0]!;
+    expect([t.code, t.original, t.external]).toEqual(["[9, 9]", "[1, 1]", undefined]);
+
+    control.setExpressionInAE(POSITION, "[2, 2]");
+    await ide.syncTabs();
+    ide.resolveExternal(POSITION, "ae");
+    t = useIde.getState().tabs[0]!;
+    expect([t.code, t.original, t.external]).toEqual(["[2, 2]", "[2, 2]", undefined]);
+  });
+
+  it("an apply landing between reads isn't mistaken for a conflict", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(POSITION, "[3, 3]");
+    control.setExpressionInAE(POSITION, "[3, 3]");
+    await ide.syncTabs();
+    const t = useIde.getState().tabs[0]!;
+    expect([t.original, t.external, isDirty(t)]).toEqual(["[3, 3]", undefined, false]);
+  });
+
+  it("auto-apply never overwrites a change made in AE", async () => {
+    const t = { ...useIde.getState().tabs[0]!, code: "[5, 5]", external: "[1, 1]" };
+    expect(canAutoApply(t)).toBe(false);
+  });
+});

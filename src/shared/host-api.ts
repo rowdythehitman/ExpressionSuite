@@ -1,4 +1,4 @@
-import type { ApplyResult, CompSchema, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "./types";
+import type { ApplyResult, BatchResult, CompSchema, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "./types";
 
 /**
  * The functions src/jsx exposes on the extension namespace. src/jsx/index.ts checks the host implements it, and
@@ -10,6 +10,8 @@ export interface HostApi {
   getChildren(key: string): TreeNode[];
   getProperty(key: string): TreeNode;
   setExpression(key: string, code: string): ApplyResult;
+  setExpressions(items: { key: string; code: string }[], undoName: string): BatchResult[];
+  getProperties(keys: string[]): (TreeNode | null)[];
   setExpressionEnabled(key: string, on: boolean): TreeNode;
   revealInTimeline(key: string): void;
   getSelectedRef(): RefTarget | null;

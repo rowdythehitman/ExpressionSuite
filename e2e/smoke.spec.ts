@@ -271,3 +271,27 @@ test("split view edits two properties side by side", async ({ page }) => {
   await right.getByLabel("Close split").click();
   await expect(right).toHaveCount(0);
 });
+
+test("a change made in AE under unapplied edits shows a banner and a diff", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, POSITION).dblclick();
+  await typeInEditor(page, "[9, 9]");
+  await page.evaluate((k) => window.__mockAE!.setExpressionInAE(k, "[1, 1]"), POSITION);
+  const banner = page.locator(".conflict");
+  await expect(banner).toContainText("changed in After Effects");
+  await banner.getByRole("button", { name: "Compare" }).click();
+  await expect(page.getByTestId("conflict-diff")).toContainText("[1, 1]");
+  await expect(page.getByTestId("conflict-diff")).toContainText("[9, 9]");
+  await banner.getByRole("button", { name: "Keep mine" }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("[9, 9]");
+  await expect(page.locator(".tab-close.dirty")).toBeVisible();
+});
+
+test("a clean tab picks up a change made in AE", async ({ page }) => {
+  await row(page, POSITION).dblclick();
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("wiggle(");
+  await page.evaluate((k) => window.__mockAE!.setExpressionInAE(k, "[7, 7]"), POSITION);
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("[7, 7]");
+  await expect(page.getByTestId("status-message")).toHaveText("Updated from After Effects: Title_Text › Position");
+});

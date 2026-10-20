@@ -43,6 +43,13 @@ export interface CompTree {
   activeKey?: string;
 }
 
+/** One item of a batch apply: the result, or why the property couldn't be set (e.g. a layer without it). */
+export interface BatchResult {
+  key: string;
+  result?: ApplyResult;
+  error?: string;
+}
+
 export interface ApplyResult {
   /** AE's expressionError after the apply, if the expression failed. */
   error?: string;

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import Editor, { type OnMount } from "@monaco-editor/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { findNode, isDirty, namesContext, referenceFor, refTargetFor, useIde, type Tab } from "../store";
@@ -35,7 +35,7 @@ export function EditorArea() {
         {tab ? (
           <>
             <Breadcrumb tabKey={tab.key} />
-            <CodeEditor tab={tab} />
+            <EditorWithConflict tab={tab} />
             <ValueStrip tabKey={tab.key} valueType={tab.valueType} />
           </>
         ) : (
@@ -57,10 +57,44 @@ export function EditorArea() {
               ×
             </button>
           </div>
-          <CodeEditor tab={split} />
+          <EditorWithConflict tab={split} />
         </div>
       )}
     </div>
+  );
+}
+
+/** The editor, or, when AE changed the expression under unapplied edits, a banner and an optional diff. */
+function EditorWithConflict({ tab }: { tab: Tab }) {
+  const [comparing, setComparing] = useState(false);
+  if (tab.external === undefined) return <CodeEditor tab={tab} />;
+  const { resolveExternal } = useIde.getState();
+  const pick = (keep: "ae" | "mine") => {
+    setComparing(false);
+    resolveExternal(tab.key, keep);
+  };
+  return (
+    <>
+      <div className="conflict" role="alert">
+        <span>This expression changed in After Effects while you had unapplied edits.</span>
+        <button onClick={() => setComparing(!comparing)}>{comparing ? "Back to editing" : "Compare"}</button>
+        <button onClick={() => pick("ae")}>Use After Effects&apos; version</button>
+        <button onClick={() => pick("mine")}>Keep mine</button>
+      </div>
+      {comparing ? (
+        <div className="code" data-testid="conflict-diff">
+          <DiffEditor
+            original={tab.external}
+            modified={tab.code}
+            language="javascript"
+            theme="ae-dark"
+            options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false }, automaticLayout: true }}
+          />
+        </div>
+      ) : (
+        <CodeEditor tab={tab} />
+      )}
+    </>
   );
 }
 

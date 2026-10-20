@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, CompSchema, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+import type { ApplyResult, BatchResult, CompSchema, CompTree, ExpressionEntry, ExpressionScan, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -366,31 +366,80 @@ export const getProperty = (key: string): TreeNode => {
   return propertyNode(key, resolveProperty(key).prop);
 };
 
-export const setExpression = (key: string, code: string): ApplyResult => {
-  const r = resolveProperty(key);
-  const prop = r.prop;
-  let thrown = "";
-  app.beginUndoGroup("Expression IDE: " + prop.name);
+/** Sets the expression without an undo group; returns what was thrown, if anything. */
+function assign(prop: Property, code: string): string {
   try {
     prop.expression = code;
     // AE disables an expression that errored; a new apply turns it back on (AE disables it again if it still fails).
     if (code !== "" && !prop.expressionEnabled) prop.expressionEnabled = true;
+    return "";
   } catch (e) {
-    thrown = String((e as any).message || e);
-  } finally {
-    app.endUndoGroup();
+    return String((e as any).message || e);
   }
-  // Evaluating the property makes AE fill in expressionError for this apply.
+}
+
+/** Evaluates the property (so AE fills in expressionError for this apply) and reports the result. */
+function readBack(key: string, r: Resolved & { prop: Property }, thrown: string): ApplyResult {
   try {
-    prop.valueAtTime(r.comp.time, false);
+    r.prop.valueAtTime(r.comp.time, false);
   } catch (_e) {
     // The error, if any, is read back below.
   }
-  const node = propertyNode(key, prop);
+  const node = propertyNode(key, r.prop);
   const result: ApplyResult = { node: node };
   if (thrown) result.error = thrown;
   else if (node.expressionError) result.error = node.expressionError;
   return result;
+}
+
+export const setExpression = (key: string, code: string): ApplyResult => {
+  const r = resolveProperty(key);
+  app.beginUndoGroup("Expression IDE: " + r.prop.name);
+  const thrown = assign(r.prop, code); // never throws
+  app.endUndoGroup();
+  return readBack(key, r, thrown);
+};
+
+/** Several applies as one undo step (batch apply, reference updates). Missing properties are reported, not thrown. */
+export const setExpressions = (items: { key: string; code: string }[], undoName: string): BatchResult[] => {
+  const resolved: any[] = [];
+  const thrown: string[] = [];
+  app.beginUndoGroup(undoName);
+  try {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i] as { key: string; code: string };
+      try {
+        const r = resolveProperty(item.key);
+        resolved.push(r);
+        thrown.push(assign(r.prop, item.code));
+      } catch (e) {
+        resolved.push(null);
+        thrown.push(String((e as any).message || e));
+      }
+    }
+  } finally {
+    app.endUndoGroup();
+  }
+  const out: BatchResult[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const key = (items[i] as { key: string }).key;
+    if (resolved[i]) out.push({ key: key, result: readBack(key, resolved[i], thrown[i] as string) });
+    else out.push({ key: key, error: thrown[i] as string });
+  }
+  return out;
+};
+
+/** Fresh reads of several properties; null for any that no longer exist. */
+export const getProperties = (keys: string[]): (TreeNode | null)[] => {
+  const out: (TreeNode | null)[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      out.push(propertyNode(keys[i] as string, resolveProperty(keys[i] as string).prop));
+    } catch (_e) {
+      out.push(null);
+    }
+  }
+  return out;
 };
 
 export const setExpressionEnabled = (key: string, on: boolean): TreeNode => {
