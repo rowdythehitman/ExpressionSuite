@@ -420,6 +420,21 @@ button {
   background: #a1260d;
 }
 
+.batch-button {
+  margin-left: auto;
+  padding: 0 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.batch-button:hover {
+  color: var(--text);
+}
+
+.batch-button + .auto-apply {
+  margin-left: 0;
+}
+
 .auto-apply {
   display: flex;
   align-items: center;

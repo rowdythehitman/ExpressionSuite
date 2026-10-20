@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureComp } from "../src/js/bridge/fixture";
 import { createMockBridge, type MockControl } from "../src/js/bridge/mock";
 import type { Bridge } from "../src/js/bridge/types";
-import { AUTO_APPLY_MS, canAutoApply, findNode, isDirty, referenceFor, setStoreBridge, useIde } from "../src/js/ide/store";
+import { AUTO_APPLY_MS, batchTargets, canAutoApply, findNode, isDirty, referenceFor, setStoreBridge, useIde } from "../src/js/ide/store";
 
 const TITLE = "100:13";
 const CTRLS = "100:11";
@@ -499,5 +499,27 @@ describe("renames", () => {
     control.renameLayer(12, "Brand");
     await fullSync();
     expect(useIde.getState().renameOffer).toBeNull();
+  });
+});
+
+describe("batch apply", () => {
+  it("applies to the same property on every selected layer, in one undo step", async () => {
+    control.selectLayers([11, 13, 15]);
+    await sync();
+    const ide = useIde.getState();
+    await ide.openProperty(SCALE, true);
+    expect(batchTargets(useIde.getState(), SCALE)).toEqual([
+      "100:11:ADBE Transform Group/ADBE Scale",
+      SCALE,
+      "100:15:ADBE Transform Group/ADBE Scale",
+    ]);
+    ide.updateCode(SCALE, "[200, 200]");
+    await ide.applyToSelected(SCALE);
+    expect(control.getExpression("100:11:ADBE Transform Group/ADBE Scale")).toBe("[200, 200]");
+    expect(control.getExpression(SCALE)).toBe("[200, 200]");
+    expect(control.undoGroups()).toEqual(["Expression IDE: Scale on 3 layers"]);
+    // The camera has no Scale.
+    expect(useIde.getState().status?.text).toBe("Applied Scale to 2 layers, 1 without Scale.");
+    expect(isDirty(useIde.getState().tabs[0]!)).toBe(false);
   });
 });

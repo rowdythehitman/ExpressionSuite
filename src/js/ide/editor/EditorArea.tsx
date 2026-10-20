@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
-import { findNode, isDirty, namesContext, referenceFor, refTargetFor, useIde, type Tab } from "../store";
+import { batchTargets, findNode, isDirty, namesContext, referenceFor, refTargetFor, useIde, type Tab } from "../store";
 import { DRAG_MIME, getDraggingKey, insertConst, insertReference, insertText, setDraggingKey } from "./insert";
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
@@ -98,6 +98,22 @@ function EditorWithConflict({ tab }: { tab: Tab }) {
   );
 }
 
+/** "Apply to N selected layers" when other layers are selected in the timeline (spec: Batch apply). */
+function BatchButton({ activeTab }: { activeTab: string | null }) {
+  // A number, not the array: a zustand selector must return a stable value.
+  const count = useIde((s) => (activeTab ? batchTargets(s, activeTab).length : 0));
+  if (!activeTab || count < 2) return null;
+  return (
+    <button
+      className="batch-button"
+      title="Apply this tab's code to the same property on every layer selected in the timeline, as one undo step"
+      onClick={() => useIde.getState().applyToSelected(activeTab)}
+    >
+      Apply to {count} selected layers
+    </button>
+  );
+}
+
 function SplitButton({ activeTab }: { activeTab: string | null }) {
   if (!activeTab) return null;
   return (
@@ -147,6 +163,7 @@ function TabBar({ tabs, activeTab }: { tabs: Tab[]; activeTab: string | null }) 
           </button>
         </div>
       ))}
+      <BatchButton activeTab={activeTab} />
       <AutoApplyToggle />
       <SplitButton activeTab={activeTab} />
     </div>

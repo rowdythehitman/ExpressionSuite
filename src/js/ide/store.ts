@@ -113,6 +113,8 @@ export interface IdeState {
   /** The reference to whatever is selected in AE's timeline, relative to the active tab (pick-from-timeline). */
   pickFromTimeline(fromKey?: string): Promise<(Reference & { target: RefTarget }) | null>;
   applyAll(): Promise<void>;
+  /** Applies the tab's code to the same property on every layer selected in the timeline, as one undo step. */
+  applyToSelected(key: string): Promise<void>;
   setStatus(status: Status | null): void;
   /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
   reset(status?: Status | null): void;
@@ -658,6 +660,48 @@ export const useIde = create<IdeState>((set, get) => {
       }
     },
 
+    async applyToSelected(key) {
+      const tab = get().tabs.find((t) => t.key === key);
+      const targets = batchTargets(get(), key);
+      if (!tab || targets.length === 0) return;
+      cancelAutoApply(key);
+      const code = tab.code;
+      let results;
+      try {
+        results = await bridge().setExpressions(
+          targets.map((k) => ({ key: k, code })),
+          `Expression IDE: ${tab.propName} on ${targets.length} layers`,
+        );
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+        return;
+      }
+      let containers: Pick<IdeState, "tree" | "loaded"> = get();
+      let ok = 0;
+      let failed = 0;
+      let missing = 0;
+      for (const r of results) {
+        if (!r.result) missing++;
+        else {
+          containers = replaceNode(containers, r.result.node);
+          if (r.result.error) failed++;
+          else ok++;
+        }
+      }
+      const own = results.find((r) => r.key === key)?.result;
+      const parts = [`Applied ${tab.propName} to ${ok} layer${ok === 1 ? "" : "s"}`];
+      if (failed) parts.push(`${failed} with errors`);
+      if (missing) parts.push(`${missing} without ${tab.propName}`);
+      set({
+        ...containers,
+        tabs: get().tabs.map((t) => (t.key === key && own ? { ...t, original: code, error: own.error, external: undefined } : t)),
+        status: { kind: failed || missing ? "info" : "ok", text: parts.join(", ") + "." },
+      });
+      void get().syncTabs(); // other open tabs on those layers follow
+      void get().refreshValue();
+      void get().refreshProblems();
+    },
+
     async applyAll() {
       for (const t of get().tabs.filter(isDirty)) await get().apply(t.key);
     },
@@ -780,6 +824,15 @@ export function referenceFor(
 ): Reference | null {
   const target = refTargetFor(state, key);
   return target ? generateReference(target, referenceContext(state, target, fromKey)) : null;
+}
+
+/** The same property (by matchName path) on each layer selected in the timeline: batch-apply targets. */
+export function batchTargets(state: Pick<IdeState, "tree">, key: string): string[] {
+  const p = parseKey(key);
+  const tree = state.tree;
+  if (!p || !tree || tree.comp.id !== p.compId || p.segments.length === 0) return [];
+  const rest = key.slice(layerKey(p.compId, p.layerId).length);
+  return tree.selectedLayerKeys.map((l) => l + rest);
 }
 
 export function isFiltering(s: Pick<IdeState, "filter" | "onlyExpressions">): boolean {

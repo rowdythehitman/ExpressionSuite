@@ -307,3 +307,13 @@ test("renaming a layer offers to update references", async ({ page }) => {
   await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("Controls")');
   expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), POSITION)).toContain('layer("Controls")');
 });
+
+test("apply to all selected layers", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await page.evaluate(() => window.__mockAE!.selectLayers([11, 13]));
+  await row(page, "100:13:ADBE Transform Group/ADBE Opacity").dblclick();
+  await typeInEditor(page, "50");
+  await page.getByRole("button", { name: "Apply to 2 selected layers" }).click();
+  await expect(page.getByTestId("status-message")).toHaveText("Applied Opacity to 2 layers.");
+  expect(await page.evaluate(() => window.__mockAE!.getExpression("100:11:ADBE Transform Group/ADBE Opacity"))).toBe("50");
+});
