@@ -1,4 +1,5 @@
 import type { editor } from "monaco-editor";
+import { layerConstName, planDeclaration } from "../references/declare";
 import { suggestConstName, type Reference, type RefTarget } from "../references/reference";
 
 /** MIME type the explorer puts on a drag, carrying the node key. */
@@ -32,14 +33,40 @@ export function insertText(ed: Editor, text: string, at?: { lineNumber: number; 
   insertReference(ed, { code: text }, at);
 }
 
-/** Alt-drop: declares the reference as a `const` on a new first line, named after the property. Returns the name. */
-export function insertConst(ed: Editor, ref: Reference, target: RefTarget): string {
-  const model = ed.getModel();
-  const name = suggestConstName(target, model?.getValue() ?? "");
-  ed.executeEdits("expression-ide", [
-    { range: { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 }, text: `const ${name} = ${ref.code};\n`, forceMoveMarkers: true },
-  ]);
+/**
+ * Declares a dropped reference as a `const` below the declarations at the top of the expression.
+ * - "property" (Alt-drop): named after the property (`speed`); only the declaration is added.
+ * - "layer" (Ctrl/Cmd-drop): named after layer + property (`ctrlsSpeed`), and the name goes in at the drop point.
+ * An existing declaration of the same reference is reused. Returns the name and whether a const was added.
+ */
+export function insertDeclaration(
+  ed: Editor,
+  ref: Reference,
+  target: RefTarget,
+  mode: "property" | "layer",
+  at?: { lineNumber: number; column: number },
+): { name: string; added: boolean } {
+  const code = ed.getModel()?.getValue() ?? "";
+  const plan = planDeclaration(code, ref.code, mode === "layer" ? layerConstName(target, code) : suggestConstName(target, code));
+  const edits: editor.IIdentifiedSingleEditOperation[] = [];
+  if (plan.text && plan.line) {
+    edits.push({
+      range: { startLineNumber: plan.line, startColumn: 1, endLineNumber: plan.line, endColumn: 1 },
+      text: plan.text,
+      forceMoveMarkers: true,
+    });
+  }
+  if (mode === "layer") {
+    const pos = at ?? ed.getPosition() ?? { lineNumber: 1, column: 1 };
+    // Ranges are in the original model's coordinates, so both edits can go in one call.
+    edits.push({
+      range: { startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: pos.lineNumber, endColumn: pos.column },
+      text: plan.name,
+      forceMoveMarkers: true,
+    });
+  }
+  ed.executeEdits("expression-ide", edits);
   ed.pushUndoStop();
   ed.focus();
-  return name;
+  return { name: plan.name, added: !!plan.text };
 }

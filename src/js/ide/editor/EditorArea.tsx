@@ -3,7 +3,7 @@ import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { batchTargets, findNode, isDirty, namesContext, referenceFor, refTargetFor, useIde, type Tab } from "../store";
-import { DRAG_MIME, getDraggingKey, insertConst, insertReference, insertText, setDraggingKey } from "./insert";
+import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertText, setDraggingKey } from "./insert";
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
@@ -42,7 +42,7 @@ export function EditorArea() {
           <div className="empty editor-empty">
             <p>Select a property in the explorer to edit its expression.</p>
             <p className="hint">Click to preview, double-click to keep the tab open. Ctrl+S applies.</p>
-            <p className="hint">Drag properties from the explorer into the code (Alt-drop for a const), or press Ctrl+Shift+P to insert the property selected in the timeline.</p>
+            <p className="hint">Drag properties from the explorer into the code. Alt-drop declares a const; Ctrl/Cmd-drop declares one named after the layer and uses it where you drop. Ctrl+Shift+P inserts the property selected in the timeline.</p>
           </div>
         )}
       </div>
@@ -300,9 +300,11 @@ function CodeEditor({ tab }: { tab: Tab }) {
           if (text) insertText(editor, text, pointAt(e));
           return;
         }
-        if (e.altKey) {
-          const name = insertConst(editor, ref, target);
-          state.setStatus({ kind: "info", text: ref.warning ?? `Added const ${name}.` });
+        if (e.altKey || e.ctrlKey || e.metaKey) {
+          // Alt: a const named after the property. Ctrl/Cmd: named after layer + property, and used at the drop point.
+          const mode = e.altKey ? "property" : "layer";
+          const { name, added } = insertDeclaration(editor, ref, target, mode, mode === "layer" ? pointAt(e) : undefined);
+          state.setStatus({ kind: "info", text: ref.warning ?? (added ? `Added const ${name}.` : `Using the existing const ${name}.`) });
         } else {
           insertReference(editor, ref, pointAt(e));
           if (ref.warning) state.setStatus({ kind: "info", text: ref.warning });

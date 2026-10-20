@@ -329,3 +329,31 @@ test("link a tab to a file; saving the file applies it", async ({ page }) => {
   await page.getByLabel("Unlink file").click();
   await expect(page.getByRole("button", { name: "Link file…" })).toBeVisible();
 });
+
+async function dropWith(page: Page, key: string, modifier: "Alt" | "Control", x = 200, line = 1) {
+  const y = 8 + (line - 1) * 19; // Monaco's default line height at 13px
+  await row(page, key).hover();
+  await page.mouse.down();
+  await page.locator(".monaco-editor .view-lines").hover({ position: { x, y } });
+  await page.keyboard.down(modifier);
+  await page.locator(".monaco-editor .view-lines").hover({ position: { x: x + 4, y } });
+  await page.mouse.up();
+  await page.keyboard.up(modifier);
+}
+
+test("Ctrl-drop declares layer + property and uses it at the drop point", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "value * ");
+  await showSlider(page);
+  await dropWith(page, SLIDER, "Control", 400);
+  const lines = page.locator(".monaco-editor .view-line");
+  await expect(lines.nth(0)).toContainText('const ctrlsSpeed = thisComp.layer("CTRLS").effect("Speed")("Slider");');
+  await expect(lines.nth(1)).toContainText("value * ctrlsSpeed");
+  // Dropping the same property again reuses the const.
+  await page.keyboard.press("End");
+  await page.keyboard.type(" + ");
+  await dropWith(page, SLIDER, "Control", 600, 2);
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("value * ctrlsSpeed + ctrlsSpeed");
+  await expect(lines).toHaveCount(2);
+});
