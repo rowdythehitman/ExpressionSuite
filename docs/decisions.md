@@ -181,3 +181,30 @@ showed a better way. Newest at the bottom.
     `dragend` is reported before `drop`. When the const and the name land on the same spot (an empty editor), they
     go in as one edit, because Monaco kept only one of two edits at the same point.
 
+## Workflow features (0.6.0)
+
+53. **Local history** records every apply (with its source: Ctrl+S, auto, file, batch, reference update), the version
+    the first apply replaced, and changes seen in AE. It keeps 50 versions per property, per saved project, in local
+    storage (in memory for unsaved projects; a new project starts empty). Restore puts the version into the tab as an
+    unapplied edit.
+54. **Inline values** come from `references/resolve.ts`, the reverse of the reference generator. It turns a plain
+    reference into a property path of names or matchNames, with alternatives where a short name is ambiguous
+    (`color`: fill or stroke). The host follows the path with `property()` in one `readReferences` call. Only
+    top-level `const/let/var x = <reference>` lines get a value, refreshed 400 ms after typing and when the playhead
+    moves.
+55. **The value graph** samples 200 points across the work area (`sampleValues`). It's re-sampled when the tab or its
+    applied expression changes, not on every playhead move; the playhead line moves on its own.
+56. **Make control** finds the outermost number / `[x, y]` / `[x, y, z]` / boolean under the cursor, or exactly the
+    selection, and names the control from its declaration or its function argument (a table of common expression
+    functions' parameters). Names are made unique per layer. One undo step (`addControl`). Snippets reuse the same
+    path (`addControls`, one undo step for all of a snippet's controls).
+57. **Find references** matches reference chains (longest form only) against the target by layer (name, index or
+    `thisLayer`) and by steps (name or matchName). An effect's references include its parameters'. Bare layer
+    references (`thisComp.layer("A")` on its own) aren't counted. Go to definition resolves the chain on the host
+    (`resolveReferenceKey`) and reveals it in the tree and the timeline.
+58. **Error hints and quick fixes** (`editor/explain.ts`) cover dimension mismatches, missing layers, effects and
+    properties, undefined names, "not a function", and common syntax errors. Fixes are edit-distance suggestions and
+    dimension wrappers, served by one Monaco code-action provider from a per-model registry the markers fill. AE's
+    exact wording for missing layers and effects is matched loosely and needs confirming in AE 2025.
+59. **In mock mode the store is `window.__ide`**, for debugging in a browser. It isn't set inside CEP.
+

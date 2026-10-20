@@ -46,6 +46,37 @@ export function setCompSchema(schema: CompSchema | null, layerId: number | null)
 }
 setCompSchema(null, null);
 
+// Quick fixes (💡, Ctrl+.) for the markers the panel sets: each marker's fixes are registered per model.
+export interface RegisteredFix {
+  range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number };
+  title: string;
+  edits: { range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number }; text: string }[];
+}
+const fixesByModel = new Map<string, Map<string, RegisteredFix[]>>();
+
+/** Replaces the fixes one marker owner ("names", "after-effects", …) offers for a model. */
+export function setQuickFixes(model: monaco.editor.ITextModel, owner: string, fixes: RegisteredFix[]): void {
+  const byOwner = fixesByModel.get(model.uri.toString()) ?? new Map<string, RegisteredFix[]>();
+  byOwner.set(owner, fixes);
+  fixesByModel.set(model.uri.toString(), byOwner);
+}
+
+monaco.languages.registerCodeActionProvider("javascript", {
+  provideCodeActions(model, range) {
+    const all = [...(fixesByModel.get(model.uri.toString())?.values() ?? [])].flat();
+    const hits = all.filter((f) => monaco.Range.areIntersectingOrTouching(f.range, range));
+    return {
+      actions: hits.map((f) => ({
+        title: f.title,
+        kind: "quickfix",
+        isPreferred: true,
+        edit: { edits: f.edits.map((e) => ({ resource: model.uri, textEdit: e, versionId: model.getVersionId() })) },
+      })),
+      dispose() {},
+    };
+  },
+});
+
 monaco.editor.defineTheme("ae-dark", {
   base: "vs-dark",
   inherit: true,

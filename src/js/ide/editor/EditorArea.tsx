@@ -4,7 +4,8 @@ import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { batchTargets, findNode, isDirty, namesContext, themeOf, referenceFor, refTargetFor, useIde, type Tab } from "../store";
 import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertText, setDraggingKey, wantsDeclaration } from "./insert";
-import { monaco, setCompSchema, setValueType } from "./monaco";
+import { monaco, type RegisteredFix, setCompSchema, setQuickFixes, setValueType } from "./monaco";
+import { declaredNames, explainError, fixName, type QuickFix } from "./explain";
 import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
 import { findControllable } from "../references/controls";
@@ -241,6 +242,42 @@ function FileLink({ tab }: { tab?: Tab }) {
   );
 }
 
+/** A marker message with the plain-language hint, and a pointer to the quick fix when there is one. */
+function withHint(message: string, e: ReturnType<typeof explainError>): string {
+  if (!e) return message;
+  return `${message}\n${e.hint}${e.fixes.length ? `\n💡 ${e.fixes[0]!.title} (Ctrl+.)` : ""}`;
+}
+
+/** Names that exist for "Did you mean": the comp's layers, the tab's comp's effects, the code's own variables. */
+function explainContext(key: string, code: string, schema: ReturnType<typeof useIde.getState>["schema"]) {
+  const [s] = namesContext(schema, key);
+  return {
+    layerNames: s?.layers.map((l) => l.name) ?? [],
+    effectNames: s?.layers.flatMap((l) => [...l.effects.map((e) => e.name), ...l.effects.flatMap((e) => e.params.map((p) => p.name))]) ?? [],
+    identifiers: declaredNames(code),
+  };
+}
+
+/** Quick fixes in Monaco's coordinates; `at` overrides where the 💡 shows (e.g. the error's line). */
+function toRegistered(
+  model: ReturnType<typeof monaco.editor.createModel>,
+  start: number,
+  end: number,
+  fixes: QuickFix[],
+  at?: { line: number; column: number; endColumn: number },
+): RegisteredFix[] {
+  const range = (a: number, b: number) => {
+    const p = model.getPositionAt(a);
+    const q = model.getPositionAt(b);
+    return { startLineNumber: p.lineNumber, startColumn: p.column, endLineNumber: q.lineNumber, endColumn: q.column };
+  };
+  return fixes.map((f) => ({
+    range: at ? { startLineNumber: at.line, startColumn: at.column, endLineNumber: at.line, endColumn: at.endColumn } : range(start, end),
+    title: f.title,
+    edits: f.edits.map((e) => ({ range: range(e.start, e.end), text: e.text })),
+  }));
+}
+
 /** Value type and comp names in completions follow the tab whose editor has focus. */
 function useTypingContext(tab: Tab): () => void {
   const schema = useIde((s) => s.schema);
@@ -464,18 +501,21 @@ function CodeEditor({ tab }: { tab: Tab }) {
     const timer = setTimeout(() => {
       const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
       if (!model) return;
+      const issues = checkNames(tab.code, ...namesContext(schema, tab.key));
+      const fixes = issues.map((n) => ({ issue: n, fixes: fixName(tab.code, n) }));
       monaco.editor.setModelMarkers(
         model,
         "names",
-        checkNames(tab.code, ...namesContext(schema, tab.key)).map((n) => ({
+        fixes.map(({ issue: n, fixes: f }) => ({
           severity: monaco.MarkerSeverity.Warning,
-          message: `${n.message} Auto-apply waits until this is fixed; Ctrl+S applies anyway.`,
+          message: `${n.message}${f.length ? ` ${f[0]!.title} (Ctrl+. to fix)` : ""} Auto-apply waits until this is fixed; Ctrl+S applies anyway.`,
           startLineNumber: n.line,
           endLineNumber: n.line,
           startColumn: n.column,
           endColumn: n.endColumn,
         })),
       );
+      setQuickFixes(model, "names", fixes.flatMap(({ issue: n, fixes: f }) => toRegistered(model, n.start, n.end, f)));
       const issue = checkSyntax(tab.code);
       const line = issue ? Math.min(issue.line, model.getLineCount()) : 1;
       monaco.editor.setModelMarkers(
@@ -485,7 +525,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
           ? [
               {
                 severity: monaco.MarkerSeverity.Error,
-                message: `SyntaxError: ${issue.message}`,
+                message: withHint(`SyntaxError: ${issue.message}`, explainError(`SyntaxError: ${issue.message}`, tab.code, explainContext(tab.key, tab.code, schema))),
                 startLineNumber: line,
                 endLineNumber: line,
                 startColumn: issue.column,
@@ -505,6 +545,12 @@ function CodeEditor({ tab }: { tab: Tab }) {
     const shown = tab.error && tab.code === tab.original ? tab.error : null;
     const parsed = shown ? parseAeError(shown) : null;
     const line = Math.min(parsed?.line ?? 1, model.getLineCount());
+    const explained = shown ? explainError(shown, tab.code, explainContext(tab.key, tab.code, useIde.getState().schema)) : null;
+    setQuickFixes(
+      model,
+      "after-effects",
+      explained ? explained.fixes.flatMap((f) => toRegistered(model, f.edits[0]!.start, f.edits[0]!.end, [f], { line, column: 1, endColumn: model.getLineMaxColumn(line) })) : [],
+    );
     monaco.editor.setModelMarkers(
       model,
       "after-effects",
@@ -512,7 +558,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
         ? [
             {
               severity: monaco.MarkerSeverity.Error,
-              message: parsed!.disabled ? `${parsed!.message}\n(After Effects disabled the expression.)` : parsed!.message,
+              message: withHint(parsed!.disabled ? `${parsed!.message}\n(After Effects disabled the expression.)` : parsed!.message, explained),
               startLineNumber: line,
               endLineNumber: line,
               startColumn: 1,

@@ -461,3 +461,18 @@ test("find references from the tree; Ctrl-click a reference to go to it", async 
   await page.keyboard.up("Control");
   await expect(page.locator(`.row.selected[data-key="${SLIDER}"]`)).toBeVisible();
 });
+
+test("quick fix: a misspelt layer name", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, 'thisComp.layer("CTLRS").transform.scale');
+  await expect(page.locator(".monaco-editor .squiggly-warning")).not.toHaveCount(0);
+  await page.keyboard.press("Home");
+  for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowRight"); // into "CTLRS"
+  await expect(async () => {
+    await page.keyboard.press("Control+Period");
+    await expect(page.getByText("Did you mean “CTRLS”?")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await page.keyboard.press("Enter"); // the first (preferred) fix
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("CTRLS").transform.scale');
+});

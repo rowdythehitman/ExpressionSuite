@@ -116,3 +116,23 @@ These items cover what only AE can answer. Tick each one off, or note what happe
 - [ ] Ctrl-drag (Cmd on Mac) adds `const ctrlsSpeed = …;` at the top and `ctrlsSpeed` at the drop point.
 - [ ] If a drop still inserts nothing, note the status-bar message: it says whether the drop arrived without data or
       failed (with the error).
+
+## 0.6.0 (workflow features)
+
+- [ ] **History:** apply a few versions, open History, compare an old one and Restore it. Reopen the project after a
+      restart: history is still there.
+- [ ] **Inline values:** `const s = thisComp.layer("CTRLS").effect("Speed")("Slider");` shows `// = <value>`, and it
+      follows the playhead on an animated slider.
+- [ ] **Value graph:** Graph on an animated Position draws x and y over the work area; the playhead line follows.
+- [ ] **Make control:** right-click the `50` in `wiggle(2, 50)` › Make control on this layer: a "Wiggle Amplitude"
+      slider at 50 appears, and one Undo removes it.
+- [ ] **Snippets:** Wiggle with sliders and Text box insert working code; their controls appear (Text Layer is a Layer
+      control set to None; pick the text layer).
+- [ ] **Find references** on CTRLS › Speed › Slider lists the expressions that use it; Ctrl-click a reference in the
+      code selects it in the timeline.
+- [ ] **Errors:** paste the exact AE text for `thisComp.layer("Nope")` and for a 1D result on Position, so the hints
+      can match AE's wording exactly:
+      ```
+      (missing layer)
+      (dimension)
+      ```

@@ -8,6 +8,11 @@ export interface NameIssue {
   column: number;
   endColumn: number;
   message: string;
+  /** Offsets of the string literal (quotes included), for quick fixes. */
+  start: number;
+  end: number;
+  /** The names that do exist there, for "Did you mean …?". */
+  candidates: string[];
 }
 
 // Minimal ESTree shapes for the parts walked here.
@@ -17,6 +22,8 @@ interface Node {
 }
 interface Literal extends Node {
   value: unknown;
+  start: number;
+  end: number;
   loc: { start: { line: number; column: number }; end: { line: number; column: number } };
 }
 
@@ -45,8 +52,16 @@ export function checkNames(code: string, schema: CompSchema | null, layerId: num
     return []; // syntax errors are reported separately
   }
   const issues: NameIssue[] = [];
-  const flag = (lit: Literal, message: string) =>
-    issues.push({ line: lit.loc.start.line, column: lit.loc.start.column + 1, endColumn: lit.loc.end.column + 1, message });
+  const flag = (lit: Literal, message: string, candidates: string[]) =>
+    issues.push({
+      line: lit.loc.start.line,
+      column: lit.loc.start.column + 1,
+      endColumn: lit.loc.end.column + 1,
+      message,
+      start: lit.start,
+      end: lit.end,
+      candidates,
+    });
   const own = schema.layers.find((l) => l.id === layerId) ?? null;
 
   /** The schema layer a node evaluates to, if it's a literal reference we can follow. */
@@ -78,16 +93,16 @@ export function checkNames(code: string, schema: CompSchema | null, layerId: num
         const layerObj = member(n.callee, "layer");
         const effectObj = member(n.callee, "effect");
         if (layerObj && isIdent(layerObj, "thisComp") && !schema.layers.some((l) => l.name === lit.value)) {
-          flag(lit, `No layer named ${JSON.stringify(lit.value)} in ${schema.compName}.`);
+          flag(lit, `No layer named ${JSON.stringify(lit.value)} in ${schema.compName}.`, schema.layers.map((l) => l.name));
         } else if (effectObj || isIdent(n.callee, "effect")) {
           const layer = effectObj ? layerOf(effectObj) : own;
           if (layer && !layer.effects.some((e) => e.name === lit.value)) {
-            flag(lit, `${layer.name} has no effect named ${JSON.stringify(lit.value)}.`);
+            flag(lit, `${layer.name} has no effect named ${JSON.stringify(lit.value)}.`, layer.effects.map((e) => e.name));
           }
         } else {
           const fx = effectOf(n.callee);
           if (fx && !fx.params.some((p) => p.name === lit.value)) {
-            flag(lit, `${fx.name} has no parameter named ${JSON.stringify(lit.value)}.`);
+            flag(lit, `${fx.name} has no parameter named ${JSON.stringify(lit.value)}.`, fx.params.map((p) => p.name));
           }
         }
       }

@@ -63,6 +63,19 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
 - **Linked files:** **Link file…** (right of the breadcrumb) writes the tab to a `.js` file. Edit it in VS Code and
   every save applies it in AE; applying in the panel writes the file back. Links are remembered per saved project:
   reopening the project reopens the linked tabs. A file edited in the meantime is loaded as an unapplied change.
+- **Make control:** right-click a number, `[x, y]`, `[x, y, z]` or `true/false` in the code › *Make control on this
+  layer* (or *on pinned layer*). It becomes a Slider, Point, 3D Point or Checkbox, named from where it sits
+  (`const speed = 5` → Speed, `wiggle(2, 50)` → Wiggle Amplitude), set to that value, and the code now references it.
+- **Snippets ▾** (tab bar): wiggle with sliders, inertial bounce, posterize time, text box (`sourceRectAtTime`),
+  loops. Inserting one creates the controls it uses and wires them in.
+- **Inline values:** `const x = <reference>;` lines show the reference's current value (`// = 2.5`).
+- **Value graph:** *Graph* on the value strip plots the property across the work area, with the playhead.
+- **Find references** (right-click a tree row) lists every expression that uses it; **Ctrl/Cmd-click** a reference in
+  the code (or F12) jumps to what it points at.
+- **Friendlier errors:** errors and name warnings come with a plain-language hint, and a 💡 quick fix (Ctrl+.) where
+  one is clear: "Did you mean CTRLS?", wrapping a 1D result for a 2D property, and so on.
+- **History** (breadcrumb): every version of the expression the panel applied or saw change in AE; compare any one
+  with the tab and restore it.
 - **Settings (⚙):** theme (follows AE's brightness, or dark or light), font size, tab width, and references by
   matchName for rigs that must work in other AE languages.
 
