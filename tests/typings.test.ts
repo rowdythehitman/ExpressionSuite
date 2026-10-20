@@ -17,8 +17,11 @@ describe("AE typings for Monaco", () => {
     expect(lib).toContain("declare class Layer");
     expect(lib).toContain('declare const wiggle: Property<any>["wiggle"];');
     expect(lib).toContain('declare const time: Layer["time"];');
-    expect(lib).toContain("declare const thisComp: Comp;");
+    expect(lib).toContain("declare const thisProject: Project;");
+    // Typed per tab (value) and per comp (thisComp, thisLayer, effect) instead.
     expect(lib).not.toContain("declare const value:");
+    expect(lib).not.toContain("declare const thisComp:");
+    expect(lib).not.toContain("declare const effect:");
   });
 
   it("types value by the property", () => {

@@ -188,3 +188,21 @@ test("completions know the AE expression API", async ({ page }) => {
   await page.keyboard.press("Control+Space");
   await expect(suggest).toContainText("wiggle");
 });
+
+test("completes real layer, effect and parameter names", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  const suggest = page.locator(".monaco-editor .suggest-widget.visible");
+  const ask = async (text: string, expected: string) => {
+    await typeInEditor(page, text);
+    await expect(async () => {
+      await page.keyboard.press("Control+Space");
+      await expect(suggest).toContainText(expected, { timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+    await page.keyboard.press("Escape");
+  };
+  // Monaco closes the quote and bracket, leaving the cursor between the quotes.
+  await ask('thisComp.layer("', "CTRLS");
+  await ask('thisComp.layer("CTRLS").effect("', "Speed");
+  await ask('thisComp.layer("CTRLS").effect("Speed")("', "Slider");
+});

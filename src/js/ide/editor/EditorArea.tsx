@@ -4,7 +4,7 @@ import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
 import { findNode, isDirty, referenceFor, refTargetFor, useIde, type Tab } from "../store";
 import { DRAG_MIME, getDraggingKey, insertConst, insertReference, insertText, setDraggingKey } from "./insert";
-import { monaco, setValueType } from "./monaco";
+import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkSyntax } from "./syntax";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
@@ -192,6 +192,14 @@ function CodeEditor({ tab }: { tab: Tab }) {
   }, [tab.key, tab.code]);
 
   useEffect(() => setValueType(tab.valueType), [tab.valueType]);
+
+  // Comp names for completions, when the tab belongs to the comp the schema describes.
+  const schema = useIde((s) => s.schema);
+  useEffect(() => {
+    const p = parseKey(tab.key);
+    const matches = !!schema && !!p && schema.compId === p.compId;
+    setCompSchema(matches ? schema : null, matches ? p!.layerId : null);
+  }, [schema, tab.key]);
 
   // Instant syntax squiggle (acorn), 200 ms after typing stops.
   useEffect(() => {

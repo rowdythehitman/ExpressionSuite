@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, CompTree, RefSegment, RefTarget, SelectionHash, TreeNode, ValueType } from "../../shared/types";
+import type { ApplyResult, CompSchema, CompTree, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -445,4 +445,26 @@ export const getSelectedRef = (): RefTarget | null => {
     layerMatchName: layer.matchName,
     path: path,
   };
+};
+
+export const getCompSchema = (): CompSchema | null => {
+  const comp = activeComp();
+  if (!comp) return null;
+  const layers: SchemaLayer[] = [];
+  for (let i = 1; i <= comp.numLayers; i++) {
+    const layer = comp.layer(i) as any;
+    const effects: SchemaEffect[] = [];
+    const parade = layer.property("ADBE Effect Parade");
+    for (let e = 1; parade && e <= parade.numProperties; e++) {
+      const fx = parade.property(e);
+      const params: { name: string; valueType: ValueType }[] = [];
+      for (let k = 1; k <= fx.numProperties; k++) {
+        const p = fx.property(k);
+        if (p.propertyType === PropertyType.PROPERTY && p.canSetExpression) params.push({ name: p.name, valueType: valueTypeOf(p) });
+      }
+      effects.push({ name: fx.name, matchName: fx.matchName, params: params });
+    }
+    layers.push({ id: layer.id, index: layer.index, name: layer.name, effects: effects });
+  }
+  return { compId: comp.id, compName: comp.name, layers: layers };
 };

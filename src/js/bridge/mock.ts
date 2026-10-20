@@ -3,7 +3,7 @@
 import { parse } from "acorn";
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
 import type { MockComp, MockLayer, MockProp } from "./fixture";
-import { type ApplyResult, type Bridge, BridgeError, type CompTree, type RefTarget, type TreeNode } from "./types";
+import { type ApplyResult, type Bridge, BridgeError, type CompSchema, type CompTree, type RefTarget, type TreeNode } from "./types";
 
 export interface MockControl {
   /** Select layers by id, as if clicked in the timeline. */
@@ -228,6 +228,25 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         p.expressionEnabled = on;
         return propertyNode(key, p);
       }, "setExpressionEnabled"),
+
+    getCompSchema: () =>
+      delay(
+        (): CompSchema => ({
+          compId: comp.id,
+          compName: comp.name,
+          layers: comp.layers.map((l, i) => ({
+            id: l.id,
+            index: i + 1,
+            name: l.name,
+            effects: (l.children.find((c) => c.matchName === "ADBE Effect Parade")?.children ?? []).map((fx) => ({
+              name: fx.name,
+              matchName: fx.matchName,
+              params: (fx.children ?? []).filter(isProperty).map((p) => ({ name: p.name, valueType: p.valueType ?? "OTHER" })),
+            })),
+          })),
+        }),
+        "getCompSchema",
+      ),
 
     getSelectedRef: () =>
       delay((): RefTarget | null => {

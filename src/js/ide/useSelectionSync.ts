@@ -46,6 +46,7 @@ export function useSelectionSync(): void {
           lastHash = hash;
           lastChange = Date.now();
           await useIde.getState().setTree(await bridge.getCompTree(TREE_DEPTH));
+          useIde.getState().setSchema(await bridge.getCompSchema());
         }
       } catch (e) {
         lastHash = null; // retry the full fetch next time

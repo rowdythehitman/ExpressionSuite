@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { type Bridge, BridgeError, type CompTree, getBridge, type TreeNode, type ValueType } from "../bridge";
+import { type Bridge, BridgeError, type CompSchema, type CompTree, getBridge, type TreeNode, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
 import { checkSyntax } from "./editor/syntax";
@@ -32,6 +32,8 @@ export interface Status {
 
 export interface IdeState {
   tree: CompTree | null;
+  /** Layer, effect and parameter names of the active comp, for completions. */
+  schema: CompSchema | null;
   loaded: Record<string, TreeNode[]>;
   expanded: Record<string, boolean>;
   loading: Record<string, boolean>;
@@ -49,6 +51,7 @@ export interface IdeState {
   refreshNonce: number;
 
   setTree(tree: CompTree | null): Promise<void>;
+  setSchema(schema: CompSchema | null): void;
   toggle(key: string): Promise<void>;
   setMode(mode: Mode): void;
   setFilter(filter: string): void;
@@ -228,6 +231,7 @@ export const useIde = create<IdeState>((set, get) => {
 
   return {
     tree: null,
+    schema: null,
     loaded: {},
     expanded: {},
     loading: {},
@@ -283,6 +287,8 @@ export const useIde = create<IdeState>((set, get) => {
       await refetch(Object.keys(stale));
       await loadExpanded();
     },
+
+    setSchema: (schema) => set({ schema }),
 
     async toggle(key) {
       const open = !!get().expanded[key] || (get().expanded[key] === undefined && isFiltering(get()));
@@ -444,6 +450,7 @@ export const useIde = create<IdeState>((set, get) => {
       cancelAutoApply();
       set({
         tree: null,
+        schema: null,
         loaded: {},
         expanded: {},
         loading: {},

@@ -74,3 +74,23 @@ export interface RefTarget {
   /** Groups then the property, from just below the layer. Empty for the layer itself. */
   path: RefSegment[];
 }
+
+/** Names the editor can complete for the active comp (spec: Dynamic typings). */
+export interface CompSchema {
+  compId: number;
+  compName: string;
+  layers: SchemaLayer[];
+}
+
+export interface SchemaLayer {
+  id: number;
+  index: number;
+  name: string;
+  effects: SchemaEffect[];
+}
+
+export interface SchemaEffect {
+  name: string;
+  matchName: string;
+  params: { name: string; valueType: ValueType }[];
+}

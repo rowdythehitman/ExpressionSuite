@@ -5,8 +5,8 @@ import { loader } from "@monaco-editor/react";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker.js?worker&inline";
 import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker.js?worker&inline";
 import aeDts from "expression-globals-typescript/dist/index.d.ts?raw";
-import { buildAeLib, contextLib } from "./typings";
-import type { ValueType } from "../../bridge";
+import { buildAeLib, compLib, contextLib } from "./typings";
+import type { CompSchema, ValueType } from "../../bridge";
 
 self.MonacoEnvironment = {
   getWorker(_id: string, label: string) {
@@ -35,6 +35,12 @@ export function setValueType(valueType: ValueType | undefined): void {
   monaco.typescript.javascriptDefaults.addExtraLib(contextLib(valueType), "file:///typings/ae-context.d.ts");
 }
 setValueType(undefined);
+
+/** thisComp / thisLayer / effect typed for the active comp and the edited layer (null schema: plain classes). */
+export function setCompSchema(schema: CompSchema | null, layerId: number | null): void {
+  monaco.typescript.javascriptDefaults.addExtraLib(compLib(schema, layerId), "file:///typings/ae-comp.d.ts");
+}
+setCompSchema(null, null);
 
 monaco.editor.defineTheme("ae-dark", {
   base: "vs-dark",
