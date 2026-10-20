@@ -217,6 +217,13 @@ button {
   text-align: center;
 }
 
+.pin {
+  flex: none;
+  width: 10px;
+  color: var(--warn);
+  font-size: 10px;
+}
+
 .layer-index {
   flex: none;
   min-width: 16px;

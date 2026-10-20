@@ -345,3 +345,28 @@ describe("problems", () => {
     expect(s.expanded["100:13"]).toBe(true);
   });
 });
+
+describe("pinning", () => {
+  afterEach(() => {
+    if (useIde.getState().pinned.includes("CTRLS")) useIde.getState().togglePin("CTRLS");
+  });
+
+  it("pins a layer open with its effects, remembers it, and unpins", async () => {
+    control.selectLayers([13]);
+    await sync();
+    useIde.getState().togglePin("CTRLS");
+    await vi.waitFor(() => expect(findNode(useIde.getState(), "100:11:ADBE Effect Parade/ADBE Slider Control")).toBeDefined());
+    expect(useIde.getState().expanded[CTRLS]).toBe(true);
+    expect(JSON.parse(localStorage.getItem("expression-ide.pinned")!)).toEqual(["CTRLS"]);
+    useIde.getState().togglePin("CTRLS");
+    expect(useIde.getState().pinned).toEqual([]);
+  });
+
+  it("opens pinned layers the first time a comp shows them", async () => {
+    useIde.setState({ pinned: ["CTRLS"] });
+    await sync();
+    expect(useIde.getState().expanded[CTRLS]).toBe(true);
+    expect(useIde.getState().expanded["100:11:ADBE Effect Parade"]).toBe(true);
+    useIde.setState({ pinned: [] });
+  });
+});

@@ -19,6 +19,7 @@ export function Explorer() {
   const selectedKey = useIde((s) => s.selectedKey);
   const activeTab = useIde((s) => s.activeTab);
   const mode = useIde((s) => s.mode);
+  const pinned = useIde((s) => s.pinned);
   const { toggle, openProperty, select, setFilter, setOnlyExpressions, setMode, reset } = useIde.getState();
   const dirtyTabs = useIde((s) => s.tabs.filter(isDirty).length);
 
@@ -28,8 +29,8 @@ export function Explorer() {
   };
 
   const rows = useMemo(
-    () => flatten({ layers: tree?.layers ?? [], loaded, expanded, loading, filter, onlyExpressions }),
-    [tree, loaded, expanded, loading, filter, onlyExpressions],
+    () => flatten({ layers: tree?.layers ?? [], loaded, expanded, loading, filter, onlyExpressions, pinned }),
+    [tree, loaded, expanded, loading, filter, onlyExpressions, pinned],
   );
   const selectedLayers = useMemo(() => new Set(tree?.selectedLayerKeys ?? []), [tree]);
 
@@ -210,6 +211,7 @@ function TreeRow({ row, top, selected, active, timelineSelected, dot, onClick, o
       title={node.expressionError ?? (disabled ? "Expression disabled" : undefined)}
     >
       <span className="twisty">{isProp ? "" : row.loading ? "…" : open ? "▾" : "▸"}</span>
+      {node.kind === "layer" && <span className={`pin ${row.pinned ? "on" : ""}`}>{row.pinned ? "★" : ""}</span>}
       {node.kind === "layer" && <span className="layer-index">{node.index}</span>}
       {isProp && <span className="fx">ƒ</span>}
       <span className="label">{node.name}</span>

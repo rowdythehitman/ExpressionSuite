@@ -43,6 +43,8 @@ export interface IdeState {
   expanded: Record<string, boolean>;
   loading: Record<string, boolean>;
   mode: Mode;
+  /** Pinned layer names, kept across sessions and comps (a CTRLS null is usually called the same everywhere). */
+  pinned: string[];
   filter: string;
   onlyExpressions: boolean;
   /** Tree row the user last clicked or the timeline selected. */
@@ -66,6 +68,7 @@ export interface IdeState {
   refreshValue(): Promise<void>;
   toggle(key: string): Promise<void>;
   setMode(mode: Mode): void;
+  togglePin(layerName: string): void;
   setFilter(filter: string): void;
   setOnlyExpressions(on: boolean): void;
   select(key: string | null): void;
@@ -91,6 +94,16 @@ export interface IdeState {
 /** Pause after the last keystroke before an automatic apply. */
 export const AUTO_APPLY_MS = 1000;
 const AUTO_APPLY_KEY = "expression-ide.autoApply";
+const PINNED_KEY = "expression-ide.pinned";
+
+function storedPinned(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PINNED_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 function storedAutoApply(): boolean {
   try {
@@ -251,6 +264,7 @@ export const useIde = create<IdeState>((set, get) => {
     expanded: {},
     loading: {},
     mode: "selection",
+    pinned: storedPinned(),
     filter: "",
     onlyExpressions: false,
     selectedKey: null,
@@ -281,6 +295,13 @@ export const useIde = create<IdeState>((set, get) => {
           for (const g of layer.children ?? []) {
             if (AUTO_OPEN_GROUPS.includes(g.matchName) && expanded[g.key] === undefined) expanded[g.key] = true;
           }
+        }
+      }
+      // Pinned layers open (with Effects) the first time they appear.
+      for (const layer of tree?.layers ?? []) {
+        if (get().pinned.includes(layer.name) && expanded[layer.key] === undefined) {
+          expanded[layer.key] = true;
+          if (expanded[`${layer.key}:ADBE Effect Parade`] === undefined) expanded[`${layer.key}:ADBE Effect Parade`] = true;
         }
       }
       let selectedKey = get().selectedKey;
@@ -346,6 +367,25 @@ export const useIde = create<IdeState>((set, get) => {
       set({ expanded: { ...get().expanded, [key]: !open } });
       autoExpanded = autoExpanded.filter((k) => k !== key);
       if (!open) await load(key);
+    },
+
+    togglePin(layerName) {
+      const on = !get().pinned.includes(layerName);
+      const pinned = on ? [...get().pinned, layerName] : get().pinned.filter((n) => n !== layerName);
+      try {
+        localStorage.setItem(PINNED_KEY, JSON.stringify(pinned));
+      } catch {
+        // A convenience only.
+      }
+      set({ pinned });
+      if (on) {
+        // Open it with its effects, where controls live.
+        const layer = get().tree?.layers.find((l) => l.name === layerName);
+        if (layer) {
+          set({ expanded: { ...get().expanded, [layer.key]: true, [`${layer.key}:ADBE Effect Parade`]: true } });
+          void loadExpanded();
+        }
+      }
     },
 
     setMode(mode) {

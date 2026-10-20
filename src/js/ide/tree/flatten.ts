@@ -5,6 +5,8 @@ export interface Row {
   node: TreeNode;
   depth: number;
   open: boolean;
+  /** A pinned layer (sits at the top). */
+  pinned?: boolean;
   /** Children are being fetched. */
   loading: boolean;
 }
@@ -17,6 +19,8 @@ export interface FlattenInput {
   loading: Record<string, boolean>;
   filter: string;
   onlyExpressions: boolean;
+  /** Names of pinned layers; they come first, whatever the mode. */
+  pinned?: string[];
 }
 
 export function childrenOf(node: TreeNode, loaded: Record<string, TreeNode[]>): TreeNode[] | undefined {
@@ -70,8 +74,11 @@ export function flatten(input: FlattenInput): Row[] {
     return [{ node, depth, open, loading: false }, ...(open ? below : [])];
   }
 
-  for (const layer of input.layers) {
+  const pinned = new Set(input.pinned ?? []);
+  const ordered = [...input.layers.filter((l) => pinned.has(l.name)), ...input.layers.filter((l) => !pinned.has(l.name))];
+  for (const layer of ordered) {
     const r = visit(layer, 0, false);
+    if (r && pinned.has(layer.name)) r[0] = { ...r[0]!, pinned: true };
     if (r) rows.push(...r);
   }
   return rows;

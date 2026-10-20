@@ -36,6 +36,10 @@ function itemsFor(node: TreeNode): Item[] {
       },
     );
   }
+  if (node.kind === "layer") {
+    const pinned = ide.pinned.includes(node.name);
+    items.push({ label: pinned ? "Unpin" : "Pin to top", run: () => ide.togglePin(node.name) });
+  }
   items.push({ label: "Reveal in timeline", run: () => ide.revealInTimeline(node.key) });
   return items;
 }

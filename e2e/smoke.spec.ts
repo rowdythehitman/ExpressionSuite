@@ -237,3 +237,15 @@ test("problems list shows the comp's errors and opens them", async ({ page }) =>
   await expect(page.getByRole("tab", { name: /Title_Text › Rotation/ })).toBeVisible();
   await expect(page.locator('.row.selected[data-key="100:13:ADBE Transform Group/ADBE Rotate Z"]')).toBeVisible();
 });
+
+test("pin a layer to the top from its context menu", async ({ page }) => {
+  await row(page, "100:14").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Pin to top" }).click();
+  await expect(page.locator(".row.layer").first()).toContainText("BG_Shape");
+  await expect(page.locator(".row.layer").first().locator(".pin")).toHaveText("★");
+  await page.reload();
+  await expect(page.locator(".row.layer").first()).toContainText("BG_Shape");
+  await row(page, "100:14").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Unpin" }).click();
+  await expect(page.locator(".row.layer").first()).toContainText("CTRLS");
+});

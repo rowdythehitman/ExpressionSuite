@@ -105,3 +105,12 @@ describe("fuzzy match on word prefixes", () => {
     expect(fuzzyMatch("rot", "X Rotation")).toBe(true);
   });
 });
+
+describe("pinned layers", () => {
+  it("come first, marked, whatever the mode", async () => {
+    const layers = await fixtureTree([13]);
+    const rows = flatten(base(layers, { pinned: ["BG_Shape"] }));
+    expect(rows.map((r) => r.node.name)).toEqual(["BG_Shape", "CTRLS", "Logo", "Title_Text", "Camera 1"]);
+    expect(rows.map((r) => !!r.pinned)).toEqual([true, false, false, false, false]);
+  });
+});
