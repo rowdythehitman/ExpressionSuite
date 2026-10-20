@@ -1,16 +1,20 @@
 // Monaco bundled locally (CEP panels are offline; @monaco-editor/react would otherwise load it from a CDN).
-// Workers are inlined as blob URLs because CEP serves the panel from file://.
+// Workers are inlined as blob URLs because CEP serves the panel from file://. Each sits in its own chunk, loaded
+// the first time Monaco asks for it: the TypeScript worker alone is most of the bundle, and the panel shouldn't
+// have to parse it before the explorer appears.
 import * as monaco from "monaco-editor";
 import { loader } from "@monaco-editor/react";
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker.js?worker&inline";
-import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker.js?worker&inline";
 import aeDts from "expression-globals-typescript/dist/index.d.ts?raw";
 import { buildAeLib, compLib, contextLib } from "./typings";
 import type { CompSchema, ValueType } from "../../bridge";
 
 self.MonacoEnvironment = {
-  getWorker(_id: string, label: string) {
-    return label === "typescript" || label === "javascript" ? new TsWorker() : new EditorWorker();
+  async getWorker(_id: string, label: string) {
+    const W =
+      label === "typescript" || label === "javascript"
+        ? (await import("monaco-editor/esm/vs/language/typescript/ts.worker.js?worker&inline")).default
+        : (await import("monaco-editor/esm/vs/editor/editor.worker.js?worker&inline")).default;
+    return new W();
   },
 };
 

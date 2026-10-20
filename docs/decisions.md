@@ -45,8 +45,7 @@ showed a better way. Newest at the bottom.
     prefixes keep `ap` → Anchor Point and `accol` → Accent Colour. Only loaded nodes can match, and a group whose name
     matches shows all its loaded children.
 14. **Monaco is bundled locally, with workers inlined as blob URLs**, because CEP is offline and serves the panel from
-    `file://`. The cost is an 11.5 MB main chunk and a ~2 minute production build. Revisit if load time in AE is noticeable
-    (try file-URL workers in CEP).
+    `file://`. (Since #51 each worker is its own lazily loaded chunk.)
 15. **Shortcuts:** the panel calls `registerKeyEventsInterest` for Ctrl/Cmd plus S, Z, Y, F, H, A, C, V, X, D, P and /, with
     the Shift and Alt variants, so AE doesn't take them (Ctrl+S would save the project).
 16. **Error line** is a placeholder regex (`line N`) until real AE 2025 error strings are collected (phase 2). The
@@ -156,4 +155,23 @@ showed a better way. Newest at the bottom.
     point of the link). An apply in the panel writes the file back. Links last for the session only.
 46. **Linking to a file that already has different code** asks whether to load it into the tab (and apply), or
     overwrite it with the tab's code.
+
+## IDE improvements
+
+47. **Ctrl/Cmd-drop** declares `const <layer><property>` and inserts the name at the drop point. Expression controls
+    use the effect name for the property (`ctrlsSpeed`); other effect parameters keep both (`titleTextDropShadowOpacity`).
+    Alt-drop still names after the property alone and only declares. Both reuse an existing `const x = <same ref>;`, and
+    both add new declarations below the single-line declarations already at the top, so they stay in the order added.
+48. **Settings** are per machine, in local storage, and sanitised on load. "Follow After Effects" reads
+    `appSkinInfo.panelBackgroundColor` and listens for `ThemeColorChanged`. Luminance above 0.5 means light, and AE's own
+    grey becomes the panel background. Tab width is pushed to every open model, because it's a per-model option in
+    Monaco.
+49. **The light theme** uses CSS variables on `:root[data-theme]`; no colours are hard-coded in components, apart from
+    the status bar's blue and red, which read in both themes.
+50. **Linked files persist per saved project file** (`{ projectPath: { key: file } }`), because keys are made of item and
+    layer ids, which are only stable within a project. Unsaved projects keep links for the session; saving carries them
+    over. A reopened link never auto-applies a file that changed while AE was closed.
+51. **Workers load lazily:** `getWorker` returns a Promise that imports the inline worker chunk on first use. The main
+    chunk went from 11.5 MB to 4.3 MB (the 7 MB TypeScript worker loads when the editor first needs it), and the
+    production build from about 2 minutes to about 1.
 

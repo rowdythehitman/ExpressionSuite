@@ -34,8 +34,10 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
 - **Auto-apply** (toggle in the tab bar, on by default): 1 s after you stop typing, a changed tab whose code has no
   syntax error is applied, just like Ctrl+S. Syntax errors squiggle as you type.
 - **References:** drag any row from the explorer into the code to insert a reference such as
-  `thisComp.layer("CTRLS").effect("Speed")("Slider")`. Hold **Alt** while dropping to add
-  `const speed = …;` on the first line instead. **Ctrl/Cmd+Shift+P** inserts a reference to the property selected in
+  `thisComp.layer("CTRLS").effect("Speed")("Slider")`. Hold **Alt** while dropping to declare `const speed = …;`
+  at the top instead. Hold **Ctrl** (Cmd on Mac) to declare one named after the layer and property
+  (`const ctrlsSpeed = …;`, `titleTextPosition`) and use it where you drop. A reference that's already declared is
+  reused. **Ctrl/Cmd+Shift+P** inserts a reference to the property selected in
   AE's timeline. References follow AE's own forms: `transform.position` on the same layer,
   `content("Rect 1").content("Fill 1").color`, `text.animator("Animator 1").property.position`, and `comp("…")` for
   other comps. When two layers share a name, the layer is referenced by index, with a warning.
@@ -60,7 +62,10 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
 - **Batch apply:** with several layers selected, **Apply to N selected layers** in the tab bar sets the same property
   on each of them, as one undo step.
 - **Linked files:** **Link file…** (right of the breadcrumb) writes the tab to a `.js` file. Edit it in VS Code and
-  every save applies it in AE; applying in the panel writes the file back.
+  every save applies it in AE; applying in the panel writes the file back. Links are remembered per saved project:
+  reopening the project reopens the linked tabs. A file edited in the meantime is loaded as an unapplied change.
+- **Settings (⚙):** theme (follows AE's brightness, or dark or light), font size, tab width, and references by
+  matchName for rigs that must work in other AE languages.
 
 The spec's ExpressionLab node view is left out; ExpressionLab stays a separate project for now.
 

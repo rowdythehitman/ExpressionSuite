@@ -95,3 +95,17 @@ These items cover what only AE can answer. Tick each one off, or note what happe
 - [ ] **Link file…** opens a save dialog. Open that file in VS Code and save a change: AE applies it within about a
       second. Applying in the panel updates the file.
 - [ ] A link survives VS Code's save (including "save as", which replaces the file).
+
+## IDE improvements (0.5.0)
+
+- [ ] The panel opens noticeably faster than 0.4.0. Completions still appear (the TypeScript worker now loads on first
+      use, under `file://`).
+- [ ] Ctrl-drag (Cmd on Mac) CTRLS › Speed › Slider into the code: `const ctrlsSpeed = …;` appears at the top and
+      `ctrlsSpeed` where you dropped. AE doesn't react to Ctrl during the drag.
+- [ ] ⚙ › Theme › Follow After Effects: change AE's Preferences › Appearance › Brightness, and the panel follows,
+      switching to light past halfway. Dark and Light override it.
+- [ ] Font size and tab width change the editor; all four settings survive a restart.
+- [ ] Reference effects by matchName: dragging the slider gives
+      `thisComp.layer("CTRLS").effect("ADBE Slider Control")("ADBE Slider Control-0001")`, and it evaluates in AE.
+- [ ] Link a tab to a file in a **saved** project, then restart AE and reopen the project: the tab reopens, linked.
+      Edit the file while AE is closed: it's loaded as an unapplied change.
