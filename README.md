@@ -4,14 +4,14 @@ After Effects tools for working with expressions, shipped as one CEP extension w
 
 | Panel | Status | Spec |
 | --- | --- | --- |
-| **Expression IDE**: a VS Code-style editor for expressions | Phases 1 and 2 built; phase 2 needs an AE test pass | [`docs/SPEC-expression-ide.md`](docs/SPEC-expression-ide.md) |
+| **Expression IDE**: a VS Code-style editor for expressions | Phases 1–3 built; phase 3 needs an AE test pass | [`docs/SPEC-expression-ide.md`](docs/SPEC-expression-ide.md) |
 
 Choices made along the way are in [`docs/decisions.md`](docs/decisions.md). Behaviour that can only be checked
 inside After Effects is listed in [`docs/ae-verification.md`](docs/ae-verification.md).
 
 Targets **After Effects 2025 (25.0) and later** (CEP 12).
 
-## Expression IDE: what works now (phases 1 and 2)
+## Expression IDE: what works now (phases 1–3)
 
 - **Explorer:** the active comp's layers as folders. Groups are subfolders and expression-capable properties are files.
   Groups with nothing scriptable are hidden. Selected layers open automatically, with Transform and Effects expanded.
@@ -41,10 +41,19 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
   other comps. When two layers share a name, the layer is referenced by index, with a warning.
 - **Right-click** a row for Copy reference, Enable/Disable/Remove expression, and Reveal in timeline.
 - **Completions** for the AE expression API (`thisComp.`, `wiggle`, `loopOut`, `linear`, …), with `value` typed for the
-  open property.
+  open property, **and for the comp's real names**: `thisComp.layer("` lists the layers, `.effect("` that layer's
+  effects, and `("` the effect's parameters, with the result typed (a slider is a number property).
+- **Name check:** a reference to a layer, effect or parameter the comp doesn't have gets a yellow squiggle, and
+  auto-apply waits until it's fixed. Ctrl+S still applies it anyway.
+- **Value strip** under the editor: the property's value after its expression, at the playhead (vectors per
+  component, colours with a swatch, Source Text as text). It follows the playhead and refreshes after every apply.
+- **Problems list** (⚠ in the status bar): every expression error in the comp; click one to open it.
+- **Pinned layers:** right-click a layer › Pin to top. It stays first, open with its effects, in every comp that has a
+  layer of that name.
+- **Split view:** ⫽ in the tab bar opens the active tab on the right, so two properties can be edited side by side.
 
-Next up (phase 3): completions for this comp's real layer, effect and parameter names, the value strip, split view,
-pinned layers and the Problems list.
+Next up (phase 4): rename-safe reference updates, batch apply across selected layers, linking a tab to a `.js` file
+for editing in VS Code, and an ExpressionLab node view.
 
 ## Development
 

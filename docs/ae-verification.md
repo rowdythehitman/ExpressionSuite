@@ -66,3 +66,17 @@ These items cover what only AE can answer. Tick each one off, or note what happe
       `mask("Mask 1").maskPath`.
 - [ ] Completions: `thisComp.` lists `layer`, `numLayers` and so on; typing `wigg` offers `wiggle`. The first popup may take
       a second.
+
+## Phase 3
+
+- [ ] `thisComp.layer("` lists this comp's layers, then `.effect("` that layer's effects, then `("` the parameters.
+      Completing a slider takes no typing of names.
+- [ ] After adding an effect to a layer, it shows up in completions once you reselect a layer.
+- [ ] A misspelled name (`effect("Sped")`) gets a yellow squiggle, and auto-apply doesn't apply it. Ctrl+S does.
+- [ ] The value strip under the editor matches what AE shows for the property: scrub the playhead and it follows.
+      Colours show a swatch and Source Text shows the text.
+- [ ] The ⚠ Problems panel lists every erroring expression in the comp; clicking one opens it and shows it in the tree.
+      Opening it on a big comp doesn't stall AE.
+- [ ] Right-click a layer › Pin to top: it moves to the top with a ★, stays pinned after restarting AE, and is pinned
+      in another comp with a layer of the same name.
+- [ ] ⫽ opens the tab on the right. Ctrl+S in the right-hand editor applies that property, not the active tab.

@@ -1,6 +1,6 @@
 import type { ApplyResult, CompSchema, CompTree, ExpressionScan, RefTarget, SelectionHash, TreeNode, ValueReading } from "../../shared/types";
 
-export type { ApplyResult, CompInfo, CompSchema, CompTree, ExpressionEntry, ExpressionScan, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
+export type { ApplyResult, CompInfo, CompSchema, SchemaEffect, SchemaLayer, CompTree, ExpressionEntry, ExpressionScan, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** Everything the panels need from After Effects. The only implementations are cep.ts (real) and mock.ts. */
 export interface Bridge {

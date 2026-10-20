@@ -113,3 +113,25 @@ showed a better way. Newest at the bottom.
     which in CEP left a literal `$0` after the reference. It's switched off. The dragged row's key is kept in memory
     from `dragstart` (CEP's browser may drop the custom MIME type), and any other dropped text goes in as plain text.
 
+## Phase 3: context-aware editing
+
+35. **Comp-name completions come from generated typings, not a custom completion provider.** `getCompSchema()` lists
+    layers, effects and parameters. `compLib` declares a type per layer whose `effect("Speed")` overload returns a type
+    per effect, callable with `("Slider")` and typed by value. TypeScript then lists the names inside the quotes and
+    types the result. Generic overloads (`layer(name: string)`) remain, so other names are never an error. `thisLayer`
+    and bare `effect` are the edited layer's. Tests run the real TypeScript language service.
+36. **The schema is fetched with the tree** (on each selection-hash change), so effects added to an unselected layer
+    show up after the next selection change, not instantly.
+37. **Value strip** reads `valueAtTime(comp.time, false)` (after the expression). The selection hash now includes the
+    comp time, so a moving playhead re-reads the value without refetching the tree, and scrubbing counts as activity
+    for the polling rate. The split pane has no strip of its own.
+38. **Problems list** scans the whole comp (`findAllExpressions`, at most 20,000 properties), but only while the panel
+    is open: on open, on tree changes and after applies. The status bar count is from the last scan.
+39. **Pinned layers are remembered by name** in local storage, so a pinned `CTRLS` is pinned in every comp that has
+    one. They open with their Effects the first time a comp shows them.
+40. **Split view** is one extra pane showing any open tab. Commands, drops and Ctrl+Shift+P act on the editor's own
+    tab, and completions follow whichever editor has focus. Both editors share the tab's Monaco model.
+41. **"Safe" for auto-apply now includes names.** `checkNames` follows literal references (`thisComp.layer("…")`,
+    `.effect("…")`, `("param")`, bare `effect("…")`, `thisLayer`) against the active comp's schema. Unknown names get a
+    warning squiggle and block auto-apply. Dynamic references (variables, indices, other comps) aren't checked.
+

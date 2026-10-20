@@ -225,6 +225,19 @@ describe("auto-apply", () => {
     expect(useIde.getState().status?.text).toBe("Auto-applied: Title_Text › Scale");
   });
 
+  it("waits while a reference names something the comp doesn't have", async () => {
+    const pending = bridge.getCompSchema(); // the mock answers on a (fake) timer
+    await vi.advanceTimersByTimeAsync(10);
+    useIde.getState().setSchema((await pending)!);
+    const ide = useIde.getState();
+    ide.updateCode(SCALE, 'value * thisComp.layer("CTRLS").effect("")');
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
+    expect(control.undoGroups()).toEqual([]);
+    ide.updateCode(SCALE, 'value * thisComp.layer("CTRLS").effect("Speed")("Slider")');
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS + 100);
+    expect(control.undoGroups()).toEqual(["Expression IDE: Scale"]);
+  });
+
   it("never auto-applies a syntax error or an emptied field", async () => {
     const ide = useIde.getState();
     ide.updateCode(SCALE, "[50, ");
@@ -368,5 +381,30 @@ describe("pinning", () => {
     expect(useIde.getState().expanded[CTRLS]).toBe(true);
     expect(useIde.getState().expanded["100:11:ADBE Effect Parade"]).toBe(true);
     useIde.setState({ pinned: [] });
+  });
+});
+
+describe("split view", () => {
+  it("shows a tab on the side, keeps it open, and closes with it", async () => {
+    control.selectLayers([13]);
+    await sync();
+    const ide = useIde.getState();
+    await ide.openProperty(POSITION, false);
+    ide.openToSide(POSITION);
+    expect(useIde.getState().splitTab).toBe(POSITION);
+    expect(useIde.getState().tabs[0]!.preview).toBe(false);
+    await ide.openProperty(SCALE, false);
+    expect(useIde.getState().tabs.map((t) => t.key)).toEqual([POSITION, SCALE]);
+    ide.closeTab(POSITION);
+    expect(useIde.getState().splitTab).toBeNull();
+  });
+
+  it("writes references relative to the editor they go into", async () => {
+    control.selectLayers([11, 13]);
+    await sync();
+    await useIde.getState().openProperty(POSITION, true);
+    const ctrlsPos = "100:11:ADBE Transform Group/ADBE Position";
+    expect(referenceFor(useIde.getState(), ctrlsPos)?.code).toBe('thisComp.layer("CTRLS").transform.position');
+    expect(referenceFor(useIde.getState(), ctrlsPos, "100:11:ADBE Transform Group/ADBE Scale")?.code).toBe("transform.position");
   });
 });

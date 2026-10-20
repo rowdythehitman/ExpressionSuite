@@ -286,7 +286,6 @@ button {
 .editor-area {
   display: flex;
   flex: 1;
-  flex-direction: column;
   min-width: 0;
   min-height: 0;
   background: var(--bg-editor);
@@ -580,4 +579,34 @@ button {
 .problems-toggle.has-errors {
   background: #a1260d;
   border-radius: 2px;
+}
+
+.editor-group {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.editor-group.split {
+  border-left: 1px solid var(--border);
+}
+
+.split-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 0 6px 0 10px;
+  background: var(--bg-sidebar);
+}
+
+.split-button {
+  padding: 0 10px;
+  color: var(--text-dim);
+}
+
+.split-button:hover {
+  color: var(--text);
 }

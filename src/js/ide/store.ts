@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
+import { checkNames } from "./editor/names";
 import { checkSyntax } from "./editor/syntax";
 import { generateReference, type RefContext, type RefTarget, type Reference } from "./references/reference";
 import { childrenOf } from "./tree/flatten";
@@ -51,6 +52,8 @@ export interface IdeState {
   selectedKey: string | null;
   tabs: Tab[];
   activeTab: string | null;
+  /** The tab shown in the right-hand pane of a split view, if any. */
+  splitTab: string | null;
   status: Status | null;
   /** Apply automatically once typing pauses and the code parses (spec: "Apply on pause"). */
   autoApply: boolean;
@@ -75,6 +78,9 @@ export interface IdeState {
   openProperty(key: string, pin: boolean): Promise<void>;
   pinTab(key: string): void;
   closeTab(key: string): void;
+  /** Shows a tab in the right-hand pane (split view); the tab is kept open (not a preview). */
+  openToSide(key: string): void;
+  closeSplit(): void;
   setActiveTab(key: string): void;
   updateCode(key: string, code: string): void;
   apply(key: string, auto?: boolean): Promise<void>;
@@ -84,7 +90,7 @@ export interface IdeState {
   setExpressionEnabled(key: string, on: boolean): Promise<void>;
   revealInTimeline(key: string): Promise<void>;
   /** The reference to whatever is selected in AE's timeline, relative to the active tab (pick-from-timeline). */
-  pickFromTimeline(): Promise<(Reference & { target: RefTarget }) | null>;
+  pickFromTimeline(fromKey?: string): Promise<(Reference & { target: RefTarget }) | null>;
   applyAll(): Promise<void>;
   setStatus(status: Status | null): void;
   /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
@@ -113,10 +119,21 @@ function storedAutoApply(): boolean {
   }
 }
 
+/** The schema when it describes the tab's comp, and the tab's layer id, for checkNames. */
+export function namesContext(schema: CompSchema | null, key: string): [CompSchema | null, number | null] {
+  const p = parseKey(key);
+  return schema && p && schema.compId === p.compId ? [schema, p.layerId] : [null, null];
+}
+
 /** Auto-apply is "safe" when the code changed, isn't empty (clearing a field mid-edit mustn't remove the
- * expression; Ctrl+S still can) and parses. */
-export function canAutoApply(tab: Tab): boolean {
-  return isDirty(tab) && tab.code.trim() !== "" && checkSyntax(tab.code) === null;
+ * expression; Ctrl+S still can), parses, and every literal layer/effect/parameter name it uses exists. */
+export function canAutoApply(tab: Tab, schema: CompSchema | null = null): boolean {
+  return (
+    isDirty(tab) &&
+    tab.code.trim() !== "" &&
+    checkSyntax(tab.code) === null &&
+    checkNames(tab.code, ...namesContext(schema, tab.key)).length === 0
+  );
 }
 
 const autoTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -270,6 +287,7 @@ export const useIde = create<IdeState>((set, get) => {
     selectedKey: null,
     tabs: [],
     activeTab: null,
+    splitTab: null,
     status: null,
     autoApply: storedAutoApply(),
     refreshNonce: 0,
@@ -434,8 +452,15 @@ export const useIde = create<IdeState>((set, get) => {
       if (i < 0) return;
       const next = tabs.filter((t) => t.key !== key);
       const activeTab = get().activeTab === key ? (next[Math.min(i, next.length - 1)]?.key ?? null) : get().activeTab;
-      set({ tabs: next, activeTab });
+      set({ tabs: next, activeTab, splitTab: get().splitTab === key ? null : get().splitTab });
     },
+
+    openToSide(key) {
+      if (!get().tabs.some((t) => t.key === key)) return;
+      set({ splitTab: key, tabs: get().tabs.map((t) => (t.key === key ? { ...t, preview: false } : t)) });
+    },
+
+    closeSplit: () => set({ splitTab: null }),
 
     setActiveTab: (key) => set({ activeTab: key, selectedKey: key }),
 
@@ -444,13 +469,13 @@ export const useIde = create<IdeState>((set, get) => {
       set({ tabs: get().tabs.map((t) => (t.key === key ? { ...t, code, preview: t.preview && code === t.original } : t)) });
       cancelAutoApply(key);
       const tab = get().tabs.find((t) => t.key === key);
-      if (!get().autoApply || !tab || !canAutoApply(tab)) return;
+      if (!get().autoApply || !tab || !canAutoApply(tab, get().schema)) return;
       autoTimers.set(
         key,
         setTimeout(() => {
           autoTimers.delete(key);
           const now = get().tabs.find((t) => t.key === key);
-          if (get().autoApply && now && now.code === code && canAutoApply(now)) get().apply(key, true);
+          if (get().autoApply && now && now.code === code && canAutoApply(now, get().schema)) get().apply(key, true);
         }, AUTO_APPLY_MS),
       );
     },
@@ -516,14 +541,14 @@ export const useIde = create<IdeState>((set, get) => {
       }
     },
 
-    async pickFromTimeline() {
+    async pickFromTimeline(fromKey) {
       try {
         const target = await bridge().getSelectedRef();
         if (!target) {
           set({ status: { kind: "info", text: "Select a property in the timeline first, then press Ctrl+Shift+P." } });
           return null;
         }
-        return { ...generateReference(target, referenceContext(get(), target)), target };
+        return { ...generateReference(target, referenceContext(get(), target, fromKey)), target };
       } catch (e) {
         set({ status: { kind: "error", text: errorText(e) } });
         return null;
@@ -552,6 +577,7 @@ export const useIde = create<IdeState>((set, get) => {
         selectedKey: null,
         tabs: [],
         activeTab: null,
+        splitTab: null,
         status,
         refreshNonce: get().refreshNonce + 1,
       });
@@ -583,9 +609,13 @@ export function refTargetFor(state: Pick<IdeState, "tree" | "loaded">, key: stri
   };
 }
 
-/** References are written relative to the active tab's layer; with no tab open, as from another layer. */
-export function referenceContext(state: Pick<IdeState, "tree" | "activeTab">, target: RefTarget): RefContext {
-  const tab = state.activeTab ? parseKey(state.activeTab) : null;
+/** References are written relative to the tab being edited (default: the active one); with none, as from another layer. */
+export function referenceContext(
+  state: Pick<IdeState, "tree" | "activeTab">,
+  target: RefTarget,
+  fromKey: string | null = state.activeTab,
+): RefContext {
+  const tab = fromKey ? parseKey(fromKey) : null;
   const sameNamed = state.tree && state.tree.comp.id === target.compId
     ? state.tree.layers.filter((l) => l.name === target.layerName).length
     : 1;
@@ -596,9 +626,13 @@ export function referenceContext(state: Pick<IdeState, "tree" | "activeTab">, ta
   };
 }
 
-export function referenceFor(state: Pick<IdeState, "tree" | "loaded" | "activeTab">, key: string): Reference | null {
+export function referenceFor(
+  state: Pick<IdeState, "tree" | "loaded" | "activeTab">,
+  key: string,
+  fromKey?: string | null,
+): Reference | null {
   const target = refTargetFor(state, key);
-  return target ? generateReference(target, referenceContext(state, target)) : null;
+  return target ? generateReference(target, referenceContext(state, target, fromKey)) : null;
 }
 
 export function isFiltering(s: Pick<IdeState, "filter" | "onlyExpressions">): boolean {

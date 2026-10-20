@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
-import { findNode, isDirty, referenceFor, refTargetFor, useIde, type Tab } from "../store";
+import { findNode, isDirty, namesContext, referenceFor, refTargetFor, useIde, type Tab } from "../store";
 import { DRAG_MIME, getDraggingKey, insertConst, insertReference, insertText, setDraggingKey } from "./insert";
 import { monaco, setCompSchema, setValueType } from "./monaco";
+import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
 import { ValueStrip } from "./ValueStrip";
 
@@ -15,7 +16,9 @@ export const modelPath = (key: string) => `file:///ide/${encodeURIComponent(key)
 export function EditorArea() {
   const tabs = useIde((s) => s.tabs);
   const activeTab = useIde((s) => s.activeTab);
+  const splitKey = useIde((s) => s.splitTab);
   const tab = tabs.find((t) => t.key === activeTab);
+  const split = tabs.find((t) => t.key === splitKey);
 
   // Drop Monaco's model (text, undo history, markers) for any tab that is gone: closed, reset, or a new project.
   useEffect(() => {
@@ -27,21 +30,51 @@ export function EditorArea() {
 
   return (
     <div className="editor-area">
-      <TabBar tabs={tabs} activeTab={activeTab} />
-      {tab ? (
-        <>
-          <Breadcrumb tabKey={tab.key} />
-          <CodeEditor tab={tab} />
-          <ValueStrip tabKey={tab.key} valueType={tab.valueType} />
-        </>
-      ) : (
-        <div className="empty editor-empty">
-          <p>Select a property in the explorer to edit its expression.</p>
-          <p className="hint">Click to preview, double-click to keep the tab open. Ctrl+S applies.</p>
-          <p className="hint">Drag properties from the explorer into the code (Alt-drop for a const), or press Ctrl+Shift+P to insert the property selected in the timeline.</p>
+      <div className="editor-group">
+        <TabBar tabs={tabs} activeTab={activeTab} />
+        {tab ? (
+          <>
+            <Breadcrumb tabKey={tab.key} />
+            <CodeEditor tab={tab} />
+            <ValueStrip tabKey={tab.key} valueType={tab.valueType} />
+          </>
+        ) : (
+          <div className="empty editor-empty">
+            <p>Select a property in the explorer to edit its expression.</p>
+            <p className="hint">Click to preview, double-click to keep the tab open. Ctrl+S applies.</p>
+            <p className="hint">Drag properties from the explorer into the code (Alt-drop for a const), or press Ctrl+Shift+P to insert the property selected in the timeline.</p>
+          </div>
+        )}
+      </div>
+      {split && (
+        <div className="editor-group split" aria-label="Split editor">
+          <div className="split-header">
+            <span className="tab-title" title={split.error ?? undefined}>
+              {split.layerName} › {split.propName}
+              {isDirty(split) && " ●"}
+            </span>
+            <button className="tab-close" aria-label="Close split" onClick={() => useIde.getState().closeSplit()}>
+              ×
+            </button>
+          </div>
+          <CodeEditor tab={split} />
         </div>
       )}
     </div>
+  );
+}
+
+function SplitButton({ activeTab }: { activeTab: string | null }) {
+  if (!activeTab) return null;
+  return (
+    <button
+      className="split-button"
+      title="Open this tab to the side (split view)"
+      aria-label="Open to the side"
+      onClick={() => useIde.getState().openToSide(activeTab)}
+    >
+      ⫽
+    </button>
   );
 }
 
@@ -81,6 +114,7 @@ function TabBar({ tabs, activeTab }: { tabs: Tab[]; activeTab: string | null }) 
         </div>
       ))}
       <AutoApplyToggle />
+      <SplitButton activeTab={activeTab} />
     </div>
   );
 }
@@ -120,23 +154,40 @@ function Breadcrumb({ tabKey }: { tabKey: string }) {
   );
 }
 
+/** Value type and comp names in completions follow the tab whose editor has focus. */
+function useTypingContext(tab: Tab): () => void {
+  const schema = useIde((s) => s.schema);
+  const apply = useCallback(() => {
+    setValueType(tab.valueType);
+    const p = parseKey(tab.key);
+    const matches = !!schema && !!p && schema.compId === p.compId;
+    setCompSchema(matches ? schema : null, matches ? p!.layerId : null);
+  }, [schema, tab.key, tab.valueType]);
+  return apply;
+}
+
 function CodeEditor({ tab }: { tab: Tab }) {
-  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const { updateCode } = useIde.getState();
+  // The tab this editor shows now; commands and drops read it when they run, as the editor outlives tab switches.
+  const keyRef = useRef(tab.key);
+  const typingContext = useTypingContext(tab);
+  const contextRef = useRef(typingContext);
+  useEffect(() => {
+    keyRef.current = tab.key;
+    contextRef.current = typingContext;
+  }, [tab.key, typingContext]);
 
   const onMount: OnMount = (editor) => {
-    editorRef.current = editor;
-    // Commands read the active tab when they run, so one editor serves every model.
+    editor.onDidFocusEditorText(() => contextRef.current());
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      const key = useIde.getState().activeTab;
-      if (key) useIde.getState().apply(key);
+      useIde.getState().apply(keyRef.current);
     });
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyS, () => {
       useIde.getState().applyAll();
     });
     // Pick from timeline: insert a reference to the property selected in AE (replaces Monaco's command palette key).
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, async () => {
-      const ref = await useIde.getState().pickFromTimeline();
+      const ref = await useIde.getState().pickFromTimeline(keyRef.current);
       if (!ref) return;
       insertReference(editor, ref);
       if (ref.warning) useIde.getState().setStatus({ kind: "info", text: ref.warning });
@@ -169,7 +220,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
         setDraggingKey(null);
         const state = useIde.getState();
         const target = key ? refTargetFor(state, key) : null;
-        const ref = key ? referenceFor(state, key) : null;
+        const ref = key ? referenceFor(state, key, keyRef.current) : null;
         if (!target || !ref) {
           if (text) insertText(editor, text, pointAt(e));
           return;
@@ -193,21 +244,30 @@ function CodeEditor({ tab }: { tab: Tab }) {
     if (model && model.getValue() !== tab.code) model.setValue(tab.code);
   }, [tab.key, tab.code]);
 
-  useEffect(() => setValueType(tab.valueType), [tab.valueType]);
-
-  // Comp names for completions, when the tab belongs to the comp the schema describes.
-  const schema = useIde((s) => s.schema);
+  // The main editor sets the completion context whenever its tab or the comp changes; the split one on focus.
+  const isMain = useIde((s) => s.activeTab === tab.key);
   useEffect(() => {
-    const p = parseKey(tab.key);
-    const matches = !!schema && !!p && schema.compId === p.compId;
-    setCompSchema(matches ? schema : null, matches ? p!.layerId : null);
-  }, [schema, tab.key]);
+    if (isMain) typingContext();
+  }, [isMain, typingContext]);
 
-  // Instant syntax squiggle (acorn), 200 ms after typing stops.
+  // Instant syntax squiggle (acorn), 200 ms after typing stops, and warnings for names the comp doesn't have.
+  const schema = useIde((s) => s.schema);
   useEffect(() => {
     const timer = setTimeout(() => {
       const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
       if (!model) return;
+      monaco.editor.setModelMarkers(
+        model,
+        "names",
+        checkNames(tab.code, ...namesContext(schema, tab.key)).map((n) => ({
+          severity: monaco.MarkerSeverity.Warning,
+          message: `${n.message} Auto-apply waits until this is fixed; Ctrl+S applies anyway.`,
+          startLineNumber: n.line,
+          endLineNumber: n.line,
+          startColumn: n.column,
+          endColumn: n.endColumn,
+        })),
+      );
       const issue = checkSyntax(tab.code);
       const line = issue ? Math.min(issue.line, model.getLineCount()) : 1;
       monaco.editor.setModelMarkers(
@@ -228,7 +288,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
       );
     }, 200);
     return () => clearTimeout(timer);
-  }, [tab.key, tab.code]);
+  }, [tab.key, tab.code, schema]);
 
   // AE's error from the last apply, on its line.
   useEffect(() => {
@@ -263,6 +323,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
         defaultValue={tab.code}
         theme="ae-dark"
         onMount={onMount}
+        keepCurrentModel
         onChange={(value) => updateCode(tab.key, value ?? "")}
         options={{
           automaticLayout: true,

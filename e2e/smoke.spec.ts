@@ -249,3 +249,25 @@ test("pin a layer to the top from its context menu", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Unpin" }).click();
   await expect(page.locator(".row.layer").first()).toContainText("CTRLS");
 });
+
+test("split view edits two properties side by side", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, POSITION).dblclick();
+  await page.getByLabel("Open to the side").click();
+  const right = page.getByLabel("Split editor");
+  await expect(right).toContainText("Title_Text › Position");
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await expect(page.getByRole("tab", { name: /Scale/ })).toHaveAttribute("aria-selected", "true");
+
+  // Edit and apply in the right-hand editor: it applies Position, not the active tab (Scale).
+  await right.locator(".monaco-editor .view-lines").click();
+  await page.keyboard.press(`${mod}+A`);
+  await page.keyboard.press("Delete");
+  await page.keyboard.type("[1, 2]");
+  await page.keyboard.press(`${mod}+S`);
+  await expect(page.getByTestId("status-message")).toHaveText("Applied: Title_Text › Position");
+  expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), POSITION)).toBe("[1, 2]");
+
+  await right.getByLabel("Close split").click();
+  await expect(right).toHaveCount(0);
+});
