@@ -31,6 +31,8 @@ export interface Bridge {
   readReferences(compId: number, layerId: number, paths: RefPath[]): Promise<(ValueReading | null)[]>;
   /** The property's value at `count` times across the comp's work area (value graph). */
   sampleValues(key: string, count: number): Promise<ValueSamples>;
+  /** Adds an expression control to a layer, set to `value`, as one undo step; resolves to the effect's name. */
+  addControl(layerId: number, matchName: string, name: string, value: number | number[]): Promise<string>;
   /** Every expression in the active comp, with AE's error for each (Problems list). */
   findAllExpressions(): Promise<ExpressionScan | null>;
 }

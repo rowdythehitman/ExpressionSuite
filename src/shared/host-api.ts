@@ -19,5 +19,6 @@ export interface HostApi {
   getValueAtTime(key: string, time?: number): ValueReading;
   readReferences(compId: number, layerId: number, paths: RefPath[]): (ValueReading | null)[];
   sampleValues(key: string, count: number): ValueSamples;
+  addControl(layerId: number, matchName: string, name: string, value: number | number[]): string;
   findAllExpressions(): ExpressionScan | null;
 }

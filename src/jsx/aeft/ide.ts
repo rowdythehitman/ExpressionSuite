@@ -642,3 +642,19 @@ export const sampleValues = (key: string, count: number): ValueSamples => {
   }
   return { start: start, end: end, times: times, values: values };
 };
+
+/** Adds an expression control (Slider, Point, 3D Point, Checkbox) to a layer and sets its value, as one undo step.
+ * Returns the effect's name as AE has it. */
+export const addControl = (layerId: number, matchName: string, name: string, value: number | number[]): string => {
+  const layer: any = app.project.layerByID(layerId);
+  if (!layer) fail("NOT_FOUND", "The layer no longer exists.");
+  app.beginUndoGroup("Expression IDE: add " + name);
+  try {
+    const fx = layer.property("ADBE Effect Parade").addProperty(matchName);
+    fx.name = name;
+    fx.property(1).setValue(value);
+    return fx.name;
+  } finally {
+    app.endUndoGroup();
+  }
+};

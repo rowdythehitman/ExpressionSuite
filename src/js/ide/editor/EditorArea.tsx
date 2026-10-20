@@ -7,6 +7,7 @@ import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertTe
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
+import { findControllable } from "../references/controls";
 import { declaredReferences } from "../references/resolve";
 import { formatValue } from "./format";
 import { HistoryPanel } from "./HistoryPanel";
@@ -312,6 +313,29 @@ function CodeEditor({ tab }: { tab: Tab }) {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyS, () => {
       useIde.getState().applyAll();
     });
+    // Make control: the number / [x, y] / boolean at the cursor becomes an expression control and a reference to it.
+    const makeControl = async (onPinned: boolean) => {
+      const model = editor.getModel();
+      const sel = editor.getSelection();
+      if (!model || !sel) return;
+      const found = findControllable(model.getValue(), model.getOffsetAt(sel.getStartPosition()), model.getOffsetAt(sel.getEndPosition()));
+      if (!found) {
+        useIde.getState().setStatus({ kind: "info", text: "Put the cursor on a number, [x, y], [x, y, z] or true/false to make a control from it." });
+        return;
+      }
+      const ref = await useIde.getState().makeControl(keyRef.current, found, onPinned);
+      if (!ref) return;
+      const a = model.getPositionAt(found.start);
+      const b = model.getPositionAt(found.end);
+      editor.executeEdits("expression-ide", [
+        { range: { startLineNumber: a.lineNumber, startColumn: a.column, endLineNumber: b.lineNumber, endColumn: b.column }, text: ref.code, forceMoveMarkers: true },
+      ]);
+      editor.pushUndoStop();
+      editor.focus();
+    };
+    editor.addAction({ id: "expression-ide.make-control", label: "Make control on this layer", contextMenuGroupId: "1_modification", run: () => makeControl(false) });
+    editor.addAction({ id: "expression-ide.make-control-pinned", label: "Make control on pinned layer", contextMenuGroupId: "1_modification", run: () => makeControl(true) });
+
     // Pick from timeline: insert a reference to the property selected in AE (replaces Monaco's command palette key).
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, async () => {
       const ref = await useIde.getState().pickFromTimeline(keyRef.current);

@@ -284,6 +284,28 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         return { time: t, value: typeof v === "number" || typeof v === "string" || Array.isArray(v) ? (v as number | number[] | string) : null };
       }, "getValueAtTime"),
 
+    addControl: (layerId, matchName, name, value) =>
+      delay(() => {
+        const layer = comp.layers.find((l) => l.id === layerId);
+        if (!layer) throw new BridgeError("NOT_FOUND", "The layer no longer exists.");
+        let parade = layer.children.find((c) => c.matchName === "ADBE Effect Parade");
+        if (!parade) {
+          parade = { name: "Effects", matchName: "ADBE Effect Parade", children: [] };
+          layer.children.unshift(parade);
+        }
+        const params: Record<string, [string, MockProp["valueType"]]> = {
+          "ADBE Slider Control": ["Slider", "1D"],
+          "ADBE Point Control": ["Point", "2D"],
+          "ADBE Point3D Control": ["3D Point", "3D"],
+          "ADBE Checkbox Control": ["Checkbox", "1D"],
+        };
+        const [param, valueType] = params[matchName] ?? ["Value", "OTHER"];
+        parade.children!.push({ name, matchName, children: [{ name: param, matchName: `${matchName}-0001`, valueType, value }] });
+        undo.push(`Expression IDE: add ${name}`);
+        version++;
+        return name;
+      }, "addControl"),
+
     sampleValues: (key, count) =>
       delay(() => {
         const p = findProperty(key);

@@ -419,3 +419,17 @@ test("value graph plots the property over the work area", async ({ page }) => {
   await expect(graph.locator(".graph-min")).toHaveText("50");
   await expect(graph.locator(".graph-playhead")).toHaveCount(1);
 });
+
+test("make a slider from a number in the code", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "wiggle(2, 50)");
+  await page.keyboard.press("ArrowLeft"); // cursor on 50
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Shift+F10"); // the context menu, at the cursor
+  await page.getByRole("menuitem", { name: "Make control on this layer" }).click();
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('wiggle(2, effect("Wiggle Amplitude")("Slider"))');
+  await expect(page.getByTestId("status-message")).toHaveText("Added Slider Control “Wiggle Amplitude” on Title_Text.");
+  // The new effect shows up in the (already open) Effects group.
+  await expect(page.locator('.row:has-text("Wiggle Amplitude")')).toBeVisible();
+});

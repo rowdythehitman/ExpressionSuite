@@ -651,3 +651,30 @@ describe("local history", () => {
     ]);
   });
 });
+
+describe("make control", () => {
+  afterEach(() => useIde.setState({ pinned: [] }));
+
+  it("adds a named control on the tab's layer and returns its reference", async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().setSchema(await bridge.getCompSchema());
+    await useIde.getState().openProperty(POSITION, true);
+    const ref = await useIde.getState().makeControl(POSITION, { start: 0, end: 2, kind: "slider", value: 50, name: "Wiggle Amplitude" }, false);
+    expect(ref?.code).toBe('effect("Wiggle Amplitude")("Slider")');
+    expect(control.undoGroups()).toEqual(["Expression IDE: add Wiggle Amplitude"]);
+    const schema = await bridge.getCompSchema();
+    expect(schema!.layers.find((l) => l.id === 13)!.effects.map((e) => e.name)).toContain("Wiggle Amplitude");
+  });
+
+  it("puts it on the pinned layer, with a unique name", async () => {
+    useIde.setState({ pinned: ["CTRLS"] });
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().setSchema(await bridge.getCompSchema());
+    await useIde.getState().openProperty(POSITION, true);
+    const ref = await useIde.getState().makeControl(POSITION, { start: 0, end: 1, kind: "point", value: [1, 2], name: "Speed" }, true);
+    // CTRLS already has a "Speed" effect.
+    expect(ref?.code).toBe('thisComp.layer("CTRLS").effect("Speed 2")("Point")');
+  });
+});

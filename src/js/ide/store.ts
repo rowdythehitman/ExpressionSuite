@@ -9,6 +9,7 @@ import type { Rgb } from "../bridge/panel";
 import { loadSettings, resolvedTheme, saveSettings, type Settings } from "./settings";
 import { checkNames } from "./editor/names";
 import { checkSyntax } from "./editor/syntax";
+import { CONTROL_SPECS, type Controllable, uniqueName } from "./references/controls";
 import { describeRenames, detectRenames, renameInCode, type Rename } from "./references/rename";
 import { generateReference, type RefContext, type RefTarget, type Reference } from "./references/reference";
 import { childrenOf } from "./tree/flatten";
@@ -98,6 +99,9 @@ export interface IdeState {
   refreshProblems(force?: boolean): Promise<void>;
   /** Expands the tree down to `key`, loading groups as needed, and selects it. */
   revealInTree(key: string): Promise<void>;
+  /** Creates an expression control for a literal in a tab's code (on the tab's layer, or the first pinned layer in
+   * the comp) and returns the reference that should replace the literal; null if it couldn't. */
+  makeControl(tabKey: string, c: Controllable, onPinned: boolean): Promise<Reference | null>;
   /** Samples a property across the work area (value graph); null if it can't be read. */
   sampleValues(key: string): Promise<ValueSamples | null>;
   /** Reads the values of references written in a tab's code (inline values). */
@@ -585,6 +589,51 @@ export const useIde = create<IdeState>((set, get) => {
       for (const k of ancestors(key)) expanded[k] = true;
       set({ expanded, selectedKey: key, filter: "", onlyExpressions: false });
       await loadExpanded();
+    },
+
+    async makeControl(tabKey, c, onPinned) {
+      const state = get();
+      const p = parseKey(tabKey);
+      const tree = state.tree;
+      if (!p || !tree || tree.comp.id !== p.compId) return null;
+      const layer = onPinned
+        ? tree.layers.find((l) => state.pinned.includes(l.name))
+        : tree.layers.find((l) => l.key === layerKey(p.compId, p.layerId));
+      if (!layer) {
+        set({ status: { kind: "info", text: "No pinned layer in this comp: right-click a layer › Pin to top first." } });
+        return null;
+      }
+      const layerId = parseKey(layer.key)!.layerId;
+      const spec = CONTROL_SPECS[c.kind];
+      const taken = state.schema?.layers.find((l) => l.id === layerId)?.effects.map((e) => e.name) ?? [];
+      const wanted = uniqueName(c.name, taken);
+      const value = typeof c.value === "boolean" ? (c.value ? 1 : 0) : c.value;
+      let name: string;
+      try {
+        name = await bridge().addControl(layerId, spec.effect, wanted, value);
+      } catch (e) {
+        set({ status: { kind: "error", text: `Couldn't add the control: ${errorText(e)}` } });
+        return null;
+      }
+      const target: RefTarget = {
+        compId: tree.comp.id,
+        compName: tree.comp.name,
+        layerId,
+        layerIndex: layer.index ?? 0,
+        layerName: layer.name,
+        layerMatchName: layer.matchName,
+        path: [
+          { name: "Effects", matchName: "ADBE Effect Parade" },
+          { name, matchName: spec.effect },
+          { name: spec.param, matchName: `${spec.effect}-0001` },
+        ],
+      };
+      // The tree and the comp names (completions, name check) pick up the new effect.
+      set({
+        refreshNonce: get().refreshNonce + 1,
+        status: { kind: "ok", text: `Added ${spec.label} Control “${name}” on ${layer.name}.` },
+      });
+      return generateReference(target, referenceContext(get(), target, tabKey));
     },
 
     async sampleValues(key) {
