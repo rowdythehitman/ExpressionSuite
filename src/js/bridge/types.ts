@@ -1,6 +1,6 @@
-import type { ApplyResult, CompTree, SelectionHash, TreeNode } from "../../shared/types";
+import type { ApplyResult, CompTree, RefTarget, SelectionHash, TreeNode } from "../../shared/types";
 
-export type { ApplyResult, CompInfo, CompTree, NodeKind, SelectionHash, TreeNode, ValueType } from "../../shared/types";
+export type { ApplyResult, CompInfo, CompTree, NodeKind, RefSegment, RefTarget, SelectionHash, TreeNode, ValueType } from "../../shared/types";
 
 /** Everything the panels need from After Effects. The only implementations are cep.ts (real) and mock.ts. */
 export interface Bridge {
@@ -17,6 +17,8 @@ export interface Bridge {
   setExpressionEnabled(key: string, on: boolean): Promise<TreeNode>;
   /** Selects the layer and property in the timeline. */
   revealInTimeline(key: string): Promise<void>;
+  /** The property (or group, or layer) selected in AE's timeline, for pick-from-timeline. */
+  getSelectedRef(): Promise<RefTarget | null>;
 }
 
 export type BridgeErrorCode = "NO_COMP" | "NOT_FOUND" | "HOST" | "TRANSPORT";

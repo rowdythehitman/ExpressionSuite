@@ -1,4 +1,4 @@
-import type { ApplyResult, CompTree, SelectionHash, TreeNode } from "./types";
+import type { ApplyResult, CompTree, RefTarget, SelectionHash, TreeNode } from "./types";
 
 /**
  * The functions src/jsx exposes on the extension namespace. src/jsx/index.ts checks the host implements it, and
@@ -12,4 +12,5 @@ export interface HostApi {
   setExpression(key: string, code: string): ApplyResult;
   setExpressionEnabled(key: string, on: boolean): TreeNode;
   revealInTimeline(key: string): void;
+  getSelectedRef(): RefTarget | null;
 }

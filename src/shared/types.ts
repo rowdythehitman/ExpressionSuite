@@ -56,3 +56,21 @@ export interface SelectionHash {
   /** Changes when the comp, selection, active property or layer list changes. */
   hash: string;
 }
+
+/** One step below a layer, for building references. */
+export interface RefSegment {
+  name: string;
+  matchName: string;
+}
+
+/** Everything the reference generator needs to address a layer, group or property. */
+export interface RefTarget {
+  compId: number;
+  compName: string;
+  layerId: number;
+  layerIndex: number;
+  layerName: string;
+  layerMatchName: string;
+  /** Groups then the property, from just below the layer. Empty for the layer itself. */
+  path: RefSegment[];
+}

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { parentKey } from "../../../shared/keys";
-import { isDirty, useIde } from "../store";
+import { isDirty, referenceFor, useIde } from "../store";
+import { DRAG_MIME } from "../editor/insert";
+import { ContextMenu, type MenuAt } from "./ContextMenu";
 import { flatten, hasExpressionBelow, type Row } from "./flatten";
 
 const ROW_HEIGHT = 22;
@@ -30,6 +32,9 @@ export function Explorer() {
     [tree, loaded, expanded, loading, filter, onlyExpressions],
   );
   const selectedLayers = useMemo(() => new Set(tree?.selectedLayerKeys ?? []), [tree]);
+
+  const [menu, setMenu] = useState<MenuAt | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Not memoised by the React Compiler; the component re-renders on every store change it reads anyway.
@@ -144,13 +149,28 @@ export function Explorer() {
                 dot={row.node.kind !== "property" && hasExpressionBelow(row.node, loaded)}
                 onClick={() => activate(row, false)}
                 onDoubleClick={() => row.node.kind === "property" && openProperty(row.node.key, true)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  select(row.node.key);
+                  setMenu({ x: e.clientX, y: e.clientY, node: row.node });
+                }}
               />
             );
           })}
         </div>
       </div>
+      {menu && <ContextMenu at={menu} onClose={closeMenu} />}
     </div>
   );
+}
+
+/** Drag carries the node key (the editor builds the reference relative to the tab it lands in) and, for other
+ * targets, the reference as plain text. */
+function onDragStart(e: React.DragEvent, key: string) {
+  e.dataTransfer.setData(DRAG_MIME, key);
+  const ref = referenceFor(useIde.getState(), key);
+  if (ref) e.dataTransfer.setData("text/plain", ref.code);
+  e.dataTransfer.effectAllowed = "copy";
 }
 
 interface TreeRowProps {
@@ -162,9 +182,10 @@ interface TreeRowProps {
   dot: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }
 
-function TreeRow({ row, top, selected, active, timelineSelected, dot, onClick, onDoubleClick }: TreeRowProps) {
+function TreeRow({ row, top, selected, active, timelineSelected, dot, onClick, onDoubleClick, onContextMenu }: TreeRowProps) {
   const { node, depth, open } = row;
   const isProp = node.kind === "property";
   const hasExpr = isProp && !!node.expression;
@@ -181,6 +202,9 @@ function TreeRow({ row, top, selected, active, timelineSelected, dot, onClick, o
       style={{ top, height: ROW_HEIGHT, paddingLeft: 4 + depth * INDENT }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
+      draggable
+      onDragStart={(e) => onDragStart(e, node.key)}
       title={node.expressionError ?? (disabled ? "Expression disabled" : undefined)}
     >
       <span className="twisty">{isProp ? "" : row.loading ? "…" : open ? "▾" : "▸"}</span>

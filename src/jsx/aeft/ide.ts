@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, CompTree, SelectionHash, TreeNode, ValueType } from "../../shared/types";
+import type { ApplyResult, CompTree, RefSegment, RefTarget, SelectionHash, TreeNode, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -410,4 +410,39 @@ export const revealInTimeline = (key: string): void => {
   r.layer.selected = true;
   if (r.target !== r.layer) (r.target as any).selected = true;
   r.comp.openInViewer();
+};
+
+export const getSelectedRef = (): RefTarget | null => {
+  const comp = activeComp();
+  if (!comp) return null;
+  // Prefer the last selected property; else the last selected group; else the first selected layer.
+  const props = comp.selectedProperties;
+  let picked: any = null;
+  for (let i = props.length - 1; i >= 0 && !picked; i--) {
+    if ((props[i] as any).propertyType === PropertyType.PROPERTY) picked = props[i];
+  }
+  if (!picked && props.length > 0) picked = props[props.length - 1];
+  const path: RefSegment[] = [];
+  let layer: any;
+  if (picked) {
+    let cur: any = picked;
+    while (cur.propertyDepth > 0) {
+      path.unshift({ name: cur.name, matchName: cur.matchName });
+      cur = cur.parentProperty;
+    }
+    layer = cur;
+  } else {
+    const layers = comp.selectedLayers;
+    if (layers.length === 0) return null;
+    layer = layers[0];
+  }
+  return {
+    compId: comp.id,
+    compName: comp.name,
+    layerId: layer.id,
+    layerIndex: layer.index,
+    layerName: layer.name,
+    layerMatchName: layer.matchName,
+    path: path,
+  };
 };

@@ -105,3 +105,52 @@ test("auto-apply: valid code applies after a pause; a syntax error squiggles and
   await page.waitForTimeout(1500);
   expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), scale)).toBe("value * 2");
 });
+
+const SLIDER = "100:11:ADBE Effect Parade/ADBE Slider Control/ADBE Slider Control-0001";
+
+async function showSlider(page: Page) {
+  await row(page, "100:11").click(); // expand CTRLS
+  await row(page, "100:11:ADBE Effect Parade").click();
+  await row(page, "100:11:ADBE Effect Parade/ADBE Slider Control").click();
+  await expect(row(page, SLIDER)).toBeVisible();
+}
+
+test("drag CTRLS › Speed › Slider into another layer's tab inserts a working reference", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "value * ");
+  await showSlider(page);
+  await row(page, SLIDER).dragTo(page.locator(".monaco-editor .view-lines"), { targetPosition: { x: 300, y: 8 } });
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('value * thisComp.layer("CTRLS").effect("Speed")("Slider")');
+});
+
+test("Alt-drop declares a const at the top", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "value");
+  await showSlider(page);
+  await row(page, SLIDER).hover();
+  await page.mouse.down();
+  await page.locator(".monaco-editor .view-lines").hover({ position: { x: 200, y: 8 } });
+  await page.keyboard.down("Alt");
+  await page.locator(".monaco-editor .view-lines").hover({ position: { x: 210, y: 8 } });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  const lines = page.locator(".monaco-editor .view-line");
+  await expect(lines.nth(0)).toContainText('const speed = thisComp.layer("CTRLS").effect("Speed")("Slider");');
+});
+
+test("right-click copies a reference; Ctrl+Shift+P picks from the timeline", async ({ page }) => {
+  await showSlider(page);
+  await row(page, SLIDER).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Copy reference" }).click();
+  await expect(page.getByTestId("status-message")).toHaveText('Copied thisComp.layer("CTRLS").effect("Speed")("Slider")');
+
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "");
+  await page.evaluate((k) => window.__mockAE!.selectProperty(k), SLIDER);
+  await page.locator(".monaco-editor .view-lines").click();
+  await page.keyboard.press(`${mod}+Shift+P`);
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("CTRLS").effect("Speed")("Slider")');
+});

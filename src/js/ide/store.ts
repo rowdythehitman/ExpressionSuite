@@ -3,6 +3,7 @@ import { type Bridge, BridgeError, type CompTree, getBridge, type TreeNode } fro
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
 import { checkSyntax } from "./editor/syntax";
+import { generateReference, type RefContext, type RefTarget, type Reference } from "./references/reference";
 import { childrenOf } from "./tree/flatten";
 
 export type Mode = "selection" | "comp";
@@ -58,6 +59,12 @@ export interface IdeState {
   updateCode(key: string, code: string): void;
   apply(key: string, auto?: boolean): Promise<void>;
   setAutoApply(on: boolean): void;
+  /** Removes the expression (one undo step) and empties its open tab. */
+  removeExpression(key: string): Promise<void>;
+  setExpressionEnabled(key: string, on: boolean): Promise<void>;
+  revealInTimeline(key: string): Promise<void>;
+  /** The reference to whatever is selected in AE's timeline, relative to the active tab (pick-from-timeline). */
+  pickFromTimeline(): Promise<(Reference & { target: RefTarget }) | null>;
   applyAll(): Promise<void>;
   setStatus(status: Status | null): void;
   /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
@@ -384,6 +391,51 @@ export const useIde = create<IdeState>((set, get) => {
 
     setStatus: (status) => set({ status }),
 
+    async removeExpression(key) {
+      cancelAutoApply(key);
+      try {
+        const res = await bridge().setExpression(key, "");
+        set({
+          tabs: get().tabs.map((t) => (t.key === key ? { ...t, code: "", original: "", error: undefined } : t)),
+          ...replaceNode(get(), res.node),
+          status: { kind: "ok", text: `Removed expression: ${res.node.name}` },
+        });
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+      }
+    },
+
+    async setExpressionEnabled(key, on) {
+      try {
+        const node = await bridge().setExpressionEnabled(key, on);
+        set({ ...replaceNode(get(), node), status: { kind: "ok", text: `${on ? "Enabled" : "Disabled"} expression: ${node.name}` } });
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+      }
+    },
+
+    async pickFromTimeline() {
+      try {
+        const target = await bridge().getSelectedRef();
+        if (!target) {
+          set({ status: { kind: "info", text: "Select a property in the timeline first, then press Ctrl+Shift+P." } });
+          return null;
+        }
+        return { ...generateReference(target, referenceContext(get(), target)), target };
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+        return null;
+      }
+    },
+
+    async revealInTimeline(key) {
+      try {
+        await bridge().revealInTimeline(key);
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+      }
+    },
+
     reset(status = null) {
       autoExpanded = [];
       cancelAutoApply();
@@ -401,6 +453,48 @@ export const useIde = create<IdeState>((set, get) => {
     },
   };
 });
+
+/** Builds a reference target for a loaded node from its ancestry in the tree. */
+export function refTargetFor(state: Pick<IdeState, "tree" | "loaded">, key: string): RefTarget | null {
+  const p = parseKey(key);
+  const tree = state.tree;
+  if (!p || !tree || tree.comp.id !== p.compId) return null;
+  const layer = findNode(state, layerKey(p.compId, p.layerId));
+  if (!layer) return null;
+  const path: RefTarget["path"] = [];
+  for (const k of [...ancestors(key), key].slice(1)) {
+    const n = findNode(state, k);
+    if (!n) return null;
+    path.push({ name: n.name, matchName: n.matchName });
+  }
+  return {
+    compId: tree.comp.id,
+    compName: tree.comp.name,
+    layerId: p.layerId,
+    layerIndex: layer.index ?? 0,
+    layerName: layer.name,
+    layerMatchName: layer.matchName,
+    path,
+  };
+}
+
+/** References are written relative to the active tab's layer; with no tab open, as from another layer. */
+export function referenceContext(state: Pick<IdeState, "tree" | "activeTab">, target: RefTarget): RefContext {
+  const tab = state.activeTab ? parseKey(state.activeTab) : null;
+  const sameNamed = state.tree && state.tree.comp.id === target.compId
+    ? state.tree.layers.filter((l) => l.name === target.layerName).length
+    : 1;
+  return {
+    compId: tab?.compId ?? target.compId,
+    layerId: tab?.layerId ?? -1,
+    duplicateLayerName: sameNamed > 1,
+  };
+}
+
+export function referenceFor(state: Pick<IdeState, "tree" | "loaded" | "activeTab">, key: string): Reference | null {
+  const target = refTargetFor(state, key);
+  return target ? generateReference(target, referenceContext(state, target)) : null;
+}
 
 export function isFiltering(s: Pick<IdeState, "filter" | "onlyExpressions">): boolean {
   return s.filter.trim() !== "" || s.onlyExpressions;

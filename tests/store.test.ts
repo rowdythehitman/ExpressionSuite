@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureComp } from "../src/js/bridge/fixture";
 import { createMockBridge, type MockControl } from "../src/js/bridge/mock";
 import type { Bridge } from "../src/js/bridge/types";
-import { AUTO_APPLY_MS, canAutoApply, findNode, isDirty, setStoreBridge, useIde } from "../src/js/ide/store";
+import { AUTO_APPLY_MS, canAutoApply, findNode, isDirty, referenceFor, setStoreBridge, useIde } from "../src/js/ide/store";
 
 const TITLE = "100:13";
 const CTRLS = "100:11";
@@ -248,5 +248,46 @@ describe("auto-apply", () => {
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
     await applied;
     expect(control.undoGroups()).toEqual(["Expression IDE: Scale"]);
+  });
+});
+
+describe("references from the tree", () => {
+  const SLIDER = "100:11:ADBE Effect Parade/ADBE Slider Control/ADBE Slider Control-0001";
+
+  beforeEach(async () => {
+    control.selectLayers([11, 13]);
+    await sync();
+    await useIde.getState().toggle("100:11:ADBE Effect Parade/ADBE Slider Control"); // load the Slider
+  });
+
+  it("writes references relative to the active tab", async () => {
+    expect(referenceFor(useIde.getState(), SLIDER)?.code).toBe('thisComp.layer("CTRLS").effect("Speed")("Slider")');
+    await useIde.getState().openProperty(POSITION, true);
+    expect(referenceFor(useIde.getState(), SLIDER)?.code).toBe('thisComp.layer("CTRLS").effect("Speed")("Slider")');
+    expect(referenceFor(useIde.getState(), SCALE)?.code).toBe("transform.scale");
+    expect(referenceFor(useIde.getState(), CTRLS)?.code).toBe('thisComp.layer("CTRLS")');
+  });
+
+  it("picks the timeline selection", async () => {
+    await useIde.getState().openProperty(POSITION, true);
+    control.selectProperty(SLIDER);
+    const ref = await useIde.getState().pickFromTimeline();
+    expect(ref?.code).toBe('thisComp.layer("CTRLS").effect("Speed")("Slider")');
+    control.selectProperty(null);
+    control.selectLayers([]);
+    expect(await useIde.getState().pickFromTimeline()).toBeNull();
+    expect(useIde.getState().status?.text).toMatch(/Select a property/);
+  });
+
+  it("removes, disables and enables expressions", async () => {
+    const ide = useIde.getState();
+    await ide.openProperty(POSITION, true);
+    await ide.setExpressionEnabled(POSITION, false);
+    expect(findNode(useIde.getState(), POSITION)?.expressionEnabled).toBe(false);
+    await ide.removeExpression(POSITION);
+    expect(control.getExpression(POSITION)).toBe("");
+    expect(useIde.getState().tabs[0]!.code).toBe("");
+    expect(findNode(useIde.getState(), POSITION)?.expression).toBe("");
+    expect(control.undoGroups()).toEqual(["Disable expression: Position", "Expression IDE: Position"]);
   });
 });

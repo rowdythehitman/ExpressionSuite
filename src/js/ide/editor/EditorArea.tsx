@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
-import { findNode, isDirty, useIde, type Tab } from "../store";
+import { findNode, isDirty, referenceFor, refTargetFor, useIde, type Tab } from "../store";
+import { DRAG_MIME, insertConst, insertReference } from "./insert";
 import { monaco } from "./monaco";
 import { checkSyntax } from "./syntax";
 
@@ -35,6 +36,7 @@ export function EditorArea() {
         <div className="empty editor-empty">
           <p>Select a property in the explorer to edit its expression.</p>
           <p className="hint">Click to preview, double-click to keep the tab open. Ctrl+S applies.</p>
+          <p className="hint">Drag properties from the explorer into the code (Alt-drop for a const), or press Ctrl+Shift+P to insert the property selected in the timeline.</p>
         </div>
       )}
     </div>
@@ -130,6 +132,38 @@ function CodeEditor({ tab }: { tab: Tab }) {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyS, () => {
       useIde.getState().applyAll();
     });
+    // Pick from timeline: insert a reference to the property selected in AE (replaces Monaco's command palette key).
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, async () => {
+      const ref = await useIde.getState().pickFromTimeline();
+      if (!ref) return;
+      insertReference(editor, ref);
+      if (ref.warning) useIde.getState().setStatus({ kind: "info", text: ref.warning });
+    });
+
+    // Drops from the explorer: the reference at the drop point, or with Alt a `const` on a new first line.
+    const dom = editor.getDomNode();
+    dom?.addEventListener(
+      "drop",
+      (e) => {
+        const key = e.dataTransfer?.getData(DRAG_MIME);
+        if (!key) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const state = useIde.getState();
+        const target = refTargetFor(state, key);
+        const ref = referenceFor(state, key);
+        if (!target || !ref) return;
+        if (e.altKey) {
+          const name = insertConst(editor, ref, target);
+          state.setStatus({ kind: "info", text: ref.warning ?? `Added const ${name}.` });
+        } else {
+          const at = editor.getTargetAtClientPoint(e.clientX, e.clientY)?.position ?? undefined;
+          insertReference(editor, ref, at);
+          if (ref.warning) state.setStatus({ kind: "info", text: ref.warning });
+        }
+      },
+      true,
+    );
     editor.focus();
   };
 

@@ -3,7 +3,7 @@
 import { parse } from "acorn";
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
 import type { MockComp, MockLayer, MockProp } from "./fixture";
-import { type ApplyResult, type Bridge, BridgeError, type CompTree, type TreeNode } from "./types";
+import { type ApplyResult, type Bridge, BridgeError, type CompTree, type RefTarget, type TreeNode } from "./types";
 
 export interface MockControl {
   /** Select layers by id, as if clicked in the timeline. */
@@ -228,6 +228,30 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
         p.expressionEnabled = on;
         return propertyNode(key, p);
       }, "setExpressionEnabled"),
+
+    getSelectedRef: () =>
+      delay((): RefTarget | null => {
+        const layerId = activeKey ? parseKey(activeKey)!.layerId : selected[0];
+        const layer = comp.layers.find((l) => l.id === layerId);
+        if (!layer) return null;
+        const path: RefTarget["path"] = [];
+        let children = layer.children;
+        for (const seg of activeKey ? parseKey(activeKey)!.segments : []) {
+          const want = parseSegment(seg);
+          const p = children.filter((c) => c.matchName === want.matchName)[want.occurrence - 1]!;
+          path.push({ name: p.name, matchName: p.matchName });
+          children = p.children ?? [];
+        }
+        return {
+          compId: comp.id,
+          compName: comp.name,
+          layerId: layer.id,
+          layerIndex: comp.layers.indexOf(layer) + 1,
+          layerName: layer.name,
+          layerMatchName: layer.matchName,
+          path,
+        };
+      }, "getSelectedRef"),
 
     revealInTimeline: (key) =>
       delay(() => {

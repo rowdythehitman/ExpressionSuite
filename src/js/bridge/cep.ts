@@ -35,5 +35,6 @@ export function createCepBridge(): Bridge {
     setExpression: (key, code) => call("setExpression", key, code),
     setExpressionEnabled: (key, on) => call("setExpressionEnabled", key, on),
     revealInTimeline: (key) => call("revealInTimeline", key),
+    getSelectedRef: () => call("getSelectedRef"),
   };
 }
