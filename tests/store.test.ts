@@ -614,3 +614,40 @@ describe("linked files across sessions", () => {
     expect(storedLinksFor("/work/Main.aep")).toEqual({});
   });
 });
+
+describe("local history", () => {
+  beforeEach(async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().openProperty(POSITION, true);
+  });
+
+  it("records the replaced version, each apply, and changes made in AE", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(POSITION, "[1, 1]");
+    await ide.apply(POSITION);
+    ide.updateCode(POSITION, "[2, 2]");
+    await ide.apply(POSITION);
+    control.setExpressionInAE(POSITION, "[3, 3]");
+    await ide.syncTabs();
+    const h = useIde.getState().history[POSITION]!;
+    expect(h.map((e) => [e.source, e.code])).toEqual([
+      ["before", 'wiggle(thisComp.layer("CTRLS").effect("Speed")("Slider"), 20)'],
+      ["apply", "[1, 1]"],
+      ["apply", "[2, 2]"],
+      ["ae", "[3, 3]"],
+    ]);
+  });
+
+  it("records batch applies on every layer", async () => {
+    control.selectLayers([11, 13]);
+    await sync();
+    useIde.getState().updateCode(POSITION, "[5, 5]");
+    await useIde.getState().applyToSelected(POSITION);
+    // It had no expression before: that empty version is kept too, so it can be restored.
+    expect(useIde.getState().history["100:11:ADBE Transform Group/ADBE Position"]!.map((e) => [e.source, e.code])).toEqual([
+      ["before", ""],
+      ["batch", "[5, 5]"],
+    ]);
+  });
+});

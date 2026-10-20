@@ -7,6 +7,7 @@ import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertTe
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
+import { HistoryPanel } from "./HistoryPanel";
 import { ValueStrip } from "./ValueStrip";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
@@ -19,6 +20,7 @@ export function EditorArea() {
   const splitKey = useIde((s) => s.splitTab);
   const tab = tabs.find((t) => t.key === activeTab);
   const split = tabs.find((t) => t.key === splitKey);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Drop Monaco's model (text, undo history, markers) for any tab that is gone: closed, reset, or a new project.
   useEffect(() => {
@@ -34,8 +36,8 @@ export function EditorArea() {
         <TabBar tabs={tabs} activeTab={activeTab} />
         {tab ? (
           <>
-            <Breadcrumb tabKey={tab.key} />
-            <EditorWithConflict tab={tab} />
+            <Breadcrumb tabKey={tab.key} onHistory={() => setHistoryOpen(!historyOpen)} />
+            {historyOpen ? <HistoryPanel tab={tab} onClose={() => setHistoryOpen(false)} /> : <EditorWithConflict tab={tab} />}
             <ValueStrip tabKey={tab.key} valueType={tab.valueType} />
           </>
         ) : (
@@ -181,7 +183,7 @@ function AutoApplyToggle() {
   );
 }
 
-function Breadcrumb({ tabKey }: { tabKey: string }) {
+function Breadcrumb({ tabKey, onHistory }: { tabKey: string; onHistory: () => void }) {
   const state = useIde();
   const parts: { key: string; name: string }[] = [];
   for (let k: string | null = tabKey; k; k = parentKey(k)) {
@@ -195,6 +197,9 @@ function Breadcrumb({ tabKey }: { tabKey: string }) {
   return (
     <div className="breadcrumb">
       <FileLink tab={tab} />
+      <button className="file-link" onClick={onHistory} title="Every version of this expression; compare and restore">
+        History
+      </button>
       <span>{state.tree?.comp.name ?? "Comp"}</span>
       {parts.map((part) => (
         <span key={part.key}>

@@ -40,6 +40,8 @@ export function useSelectionSync(): void {
             kind: "info",
             text: dirty ? `New project: closed the editor (${dirty} tab${dirty > 1 ? "s" : ""} had unapplied changes).` : "New project: editor reset.",
           });
+          // History belongs to the old project; the new one's is loaded below if it's saved.
+          useIde.setState({ history: {}, projectPath: "" });
         }
         lastProject = project;
         const nonce = useIde.getState().refreshNonce;

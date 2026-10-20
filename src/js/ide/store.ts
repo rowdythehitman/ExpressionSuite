@@ -3,6 +3,7 @@ import { getFiles, suggestFileName } from "../bridge/files";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
+import { addEntry, loadHistory, saveHistory, type HistoryEntry, type HistorySource } from "./history";
 import type { Rgb } from "../bridge/panel";
 import { loadSettings, resolvedTheme, saveSettings, type Settings } from "./settings";
 import { checkNames } from "./editor/names";
@@ -66,6 +67,8 @@ export interface IdeState {
   settings: Settings;
   /** After Effects' panel background (for theme "ae"). */
   hostBackground: Rgb;
+  /** Local history: every version applied (or seen changing in AE), per property key. */
+  history: Record<string, HistoryEntry[]>;
   /** The saved project's path ("" while unsaved); linked files are remembered per project. */
   projectPath: string;
   /** Pinned layer names, kept across sessions and comps (a CTRLS null is usually called the same everywhere). */
@@ -375,6 +378,16 @@ export const useIde = create<IdeState>((set, get) => {
     });
   }
 
+  /** Records a version in local history; on a property's first entry, also the version it replaced. */
+  function record(key: string, before: string | undefined, code: string, source: HistorySource): void {
+    const history = { ...get().history };
+    let list = history[key];
+    if (!list?.length && before !== undefined && before !== code) list = addEntry(list, { time: Date.now() - 1, code: before, source: "before" });
+    history[key] = addEntry(list, { time: Date.now(), code, source });
+    set({ history });
+    saveHistory(get().projectPath, history);
+  }
+
   /** Open tabs (in the schema's comp) whose code still uses old names, with the rewritten code. */
   function tabRenames(state: IdeState, renames: Rename[]): { key: string; code: string; count: number }[] {
     const schema = state.schema;
@@ -390,7 +403,7 @@ export const useIde = create<IdeState>((set, get) => {
   }
 
   /** The comp's applied expressions that still use old names, with the rewritten code. */
-  async function compRenames(renames: Rename[]): Promise<{ key: string; code: string; count: number }[]> {
+  async function compRenames(renames: Rename[]): Promise<{ key: string; code: string; count: number; before: string }[]> {
     const schema = get().schema;
     if (!schema) return [];
     let scan: ExpressionScan | null;
@@ -399,10 +412,10 @@ export const useIde = create<IdeState>((set, get) => {
     } catch {
       return [];
     }
-    const out: { key: string; code: string; count: number }[] = [];
+    const out: { key: string; code: string; count: number; before: string }[] = [];
     for (const e of scan?.entries ?? []) {
       const r = renameInCode(e.expression, renames, { compName: schema.compName, layerId: parseKey(e.key)?.layerId ?? null });
-      if (r.count) out.push({ key: e.key, ...r });
+      if (r.count) out.push({ key: e.key, ...r, before: e.expression });
     }
     return out;
   }
@@ -435,6 +448,7 @@ export const useIde = create<IdeState>((set, get) => {
     mode: "selection",
     pinned: storedPinned(),
     projectPath: "",
+    history: {},
     settings: loadSettings(),
     hostBackground: { r: 35, g: 35, b: 35 },
     filter: "",
@@ -525,6 +539,7 @@ export const useIde = create<IdeState>((set, get) => {
               `Expression IDE: update references (${offer.summary})`,
             );
             compDone = edits.reduce((n, e) => n + e.count, 0);
+            for (const e of edits) record(e.key, e.before, e.code, "rename");
           } catch (e) {
             set({ status: { kind: "error", text: errorText(e) } });
             return;
@@ -713,6 +728,7 @@ export const useIde = create<IdeState>((set, get) => {
         if (ae === t.original) return t.error === error ? t : { ...t, error };
         // AE now holds exactly what the tab shows (e.g. an apply just landed): nothing to resolve.
         if (ae === t.code) return { ...t, original: ae, error, external: undefined };
+        if (t.external !== ae) record(t.key, t.original, ae, "ae");
         if (!isDirty(t)) {
           updated.push(`${t.layerName} › ${t.propName}`);
           return { ...t, code: ae, original: ae, error, external: undefined };
@@ -754,6 +770,7 @@ export const useIde = create<IdeState>((set, get) => {
       const label = `${tab.layerName} › ${tab.propName}`;
       try {
         const res = await bridge().setExpression(key, code);
+        record(key, tab.original, code, fromFile ? "file" : auto ? "auto" : "apply");
         set({
           tabs: get().tabs.map((t) => (t.key === key ? { ...t, original: code, error: res.error, external: undefined } : t)),
           ...replaceNode(get(), res.node),
@@ -818,7 +835,10 @@ export const useIde = create<IdeState>((set, get) => {
       if (path === get().projectPath) return;
       // Saving an unsaved project: carry its links over to the new path.
       const before = get().projectPath;
-      set({ projectPath: path });
+      // Saving an unsaved project keeps this session's history; opening another loads that project's.
+      const history = !before && path ? { ...loadHistory(path), ...get().history } : loadHistory(path);
+      set({ projectPath: path, history });
+      if (!before && path) saveHistory(path, history);
       if (!before && path) for (const t of get().tabs) if (t.linkedFile) storeLink(path, t.key, t.linkedFile);
       const links = storedLinks(path);
       for (const key of Object.keys(links)) {
@@ -851,6 +871,8 @@ export const useIde = create<IdeState>((set, get) => {
       for (const r of results) {
         if (!r.result) missing++;
         else {
+          const before = get().tabs.find((t) => t.key === r.key)?.original ?? findNode(get(), r.key)?.expression;
+          record(r.key, before, code, "batch");
           containers = replaceNode(containers, r.result.node);
           if (r.result.error) failed++;
           else ok++;
@@ -880,6 +902,7 @@ export const useIde = create<IdeState>((set, get) => {
       cancelAutoApply(key);
       try {
         const res = await bridge().setExpression(key, "");
+        record(key, get().tabs.find((t) => t.key === key)?.original ?? findNode(get(), key)?.expression, "", "apply");
         set({
           tabs: get().tabs.map((t) => (t.key === key ? { ...t, code: "", original: "", error: undefined } : t)),
           ...replaceNode(get(), res.node),

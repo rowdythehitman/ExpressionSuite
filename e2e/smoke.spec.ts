@@ -373,3 +373,22 @@ test("plain drop inserts the reference; Ctrl-drop into an empty editor declares 
   await expect(lines.nth(0)).toHaveText('const ctrlsSpeed = thisComp.layer("CTRLS").effect("Speed")("Slider");');
   await expect(lines.nth(1)).toHaveText("ctrlsSpeed");
 });
+
+test("history: compare an earlier version and restore it", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await typeInEditor(page, "[10, 10]");
+  await page.keyboard.press(`${mod}+S`);
+  await typeInEditor(page, "[20, 20]");
+  await page.keyboard.press(`${mod}+S`);
+  await page.getByRole("button", { name: "History" }).click();
+  const panel = page.getByRole("region", { name: "History" });
+  // Newest first: [20, 20], [10, 10], and "before" (no expression).
+  await expect(panel.locator(".history-entry")).toHaveCount(3);
+  await expect(panel.locator(".history-entry").nth(2)).toContainText("(no expression)");
+  await panel.locator(".history-entry").nth(1).click();
+  await expect(page.getByTestId("history-diff")).toContainText("[10, 10]");
+  await panel.getByRole("button", { name: "Restore this version" }).click();
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("[10, 10]");
+  await expect(page.locator(".tab-close.dirty")).toBeVisible(); // restored as an unapplied edit
+});
