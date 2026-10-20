@@ -17,6 +17,8 @@ export interface MockControl {
   getExpression(key: string): string;
   /** Undo-group names opened so far, oldest first. */
   undoGroups(): string[];
+  /** Switch to a new project (File › New Project); defaults to a one-solid comp reusing the fixture's ids. */
+  newProject(comp?: MockComp): void;
   /** Calls made, by function name. */
   calls(): { [fn: string]: number };
 }
@@ -38,19 +40,48 @@ function containsExpression(children: MockProp[]): boolean {
   return children.some((c) => (isProperty(c) ? !!c.expression : containsExpression(c.children ?? [])));
 }
 
-/** Mimics AE's expressionError for syntax errors (runtime errors aren't simulated). */
-export function mockEvaluate(code: string): string | undefined {
+export interface ErrorContext {
+  property: string;
+  layerIndex: number;
+  layerName: string;
+  compName: string;
+}
+
+/** AE 2025's expressionError wording (from a real report); syntax errors only, runtime errors aren't simulated. */
+export function aeErrorText(line: number, error: string, at: ErrorContext): string {
+  return (
+    "Expression Disabled\n" +
+    `Error at line ${line} in property '${at.property}' of layer ${at.layerIndex} ('${at.layerName}') in comp '${at.compName}'.\n` +
+    error
+  );
+}
+
+export function mockEvaluate(code: string, at: ErrorContext): string | undefined {
   try {
     parse(code, { ecmaVersion: 2020, allowReturnOutsideFunction: true });
     return undefined;
   } catch (e) {
     const err = e as SyntaxError & { loc?: { line: number } };
     const msg = err.message.replace(/\s*\(\d+:\d+\)$/, "");
-    return `SyntaxError: ${msg} (line ${err.loc?.line ?? 1})`;
+    return aeErrorText(err.loc?.line ?? 1, `SyntaxError: ${msg}`, at);
   }
 }
 
-export function createMockBridge(comp: MockComp, opts: { latencyMs?: number } = {}): { bridge: Bridge; control: MockControl } {
+/** What a brand-new project looks like to the panel: a comp with the same id as the fixture's, to catch stale keys. */
+export function emptyProjectComp(): MockComp {
+  return { id: 100, name: "Comp 1", width: 1920, height: 1080, frameRate: 25, layers: [
+    { id: 11, name: "Dark Yellow Solid 1", matchName: "ADBE AV Layer", children: [
+      { name: "Transform", matchName: "ADBE Transform Group", children: [
+        { name: "Anchor Point", matchName: "ADBE Anchor Point", valueType: "2D", value: [960, 540] },
+        { name: "Position", matchName: "ADBE Position", valueType: "2D", value: [960, 540] },
+      ] },
+    ] },
+  ] };
+}
+
+export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: number } = {}): { bridge: Bridge; control: MockControl } {
+  let comp = initialComp;
+  let project = 0;
   let selected: number[] = [];
   let activeKey: string | null = null;
   let version = 0; // bumped on structural or expression edits made "in AE"
@@ -150,8 +181,10 @@ export function createMockBridge(comp: MockComp, opts: { latencyMs?: number } = 
   const bridge: Bridge = {
     getSelectionHash: () =>
       delay(
-        () =>
-          [comp.id, comp.name, selected.join(","), activeKey ?? "", version, comp.layers.map((l) => `${l.id}=${l.name}`).join(",")].join("|"),
+        () => ({
+          project,
+          hash: [comp.id, comp.name, selected.join(","), activeKey ?? "", version, comp.layers.map((l) => `${l.id}=${l.name}`).join(",")].join("|"),
+        }),
         "getSelectionHash",
       ),
 
@@ -179,8 +212,11 @@ export function createMockBridge(comp: MockComp, opts: { latencyMs?: number } = 
         const p = findProperty(key);
         undo.push(`Expression IDE: ${p.name}`);
         p.expression = code;
-        p.expressionEnabled = true;
-        p.expressionError = code === "" ? undefined : mockEvaluate(code);
+        const { layer } = find(key);
+        const at = { property: p.name, layerIndex: comp.layers.indexOf(layer) + 1, layerName: layer.name, compName: comp.name };
+        p.expressionError = code === "" ? undefined : mockEvaluate(code, at);
+        // Like AE: an erroring expression is switched off; a good apply switches it back on.
+        p.expressionEnabled = !p.expressionError;
         const node = propertyNode(key, p);
         return node.expressionError ? { node, error: node.expressionError } : { node };
       }, "setExpression"),
@@ -220,6 +256,12 @@ export function createMockBridge(comp: MockComp, opts: { latencyMs?: number } = 
     setExpressionInAE(key, code) {
       findProperty(key).expression = code;
       version++;
+    },
+    newProject(next) {
+      comp = next ?? emptyProjectComp();
+      project++;
+      selected = [];
+      activeKey = null;
     },
     getExpression: (key) => findProperty(key).expression ?? "",
     undoGroups: () => [...undo],

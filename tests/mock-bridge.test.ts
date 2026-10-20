@@ -30,13 +30,14 @@ describe("mock bridge", () => {
 
   it("changes the selection hash on selection and renames", async () => {
     const { bridge, control } = createMockBridge(fixtureComp());
-    const h1 = await bridge.getSelectionHash();
+    const hash = async () => (await bridge.getSelectionHash()).hash;
+    const h1 = await hash();
     control.selectLayers([11]);
-    const h2 = await bridge.getSelectionHash();
+    const h2 = await hash();
     control.renameLayer(11, "Controls");
-    const h3 = await bridge.getSelectionHash();
+    const h3 = await hash();
     expect(new Set([h1, h2, h3]).size).toBe(3);
-    expect(await bridge.getSelectionHash()).toBe(h3);
+    expect(await hash()).toBe(h3);
   });
 
   it("raises NOT_FOUND for keys that no longer resolve", async () => {
@@ -58,8 +59,26 @@ describe("mock bridge", () => {
     ]);
   });
 
-  it("evaluates like AE for syntax only", () => {
-    expect(mockEvaluate("wiggle(2, 50)")).toBeUndefined();
-    expect(mockEvaluate("time *")).toMatch(/^SyntaxError: .* \(line 1\)$/);
+  it("evaluates like AE for syntax only, in AE's wording", () => {
+    const at = { property: "Position", layerIndex: 3, layerName: "Title_Text", compName: "Main_Title" };
+    expect(mockEvaluate("wiggle(2, 50)", at)).toBeUndefined();
+    expect(mockEvaluate("1;\ntime *", at)).toBe(
+      "Expression Disabled\nError at line 2 in property 'Position' of layer 3 ('Title_Text') in comp 'Main_Title'.\nSyntaxError: Unexpected token",
+    );
+  });
+
+  it("disables an expression that errors and re-enables it on a good apply", async () => {
+    const { bridge } = createMockBridge(fixtureComp());
+    expect((await bridge.setExpression(POSITION, "time *")).node.expressionEnabled).toBe(false);
+    expect((await bridge.setExpression(POSITION, "time * 2")).node.expressionEnabled).toBe(true);
+  });
+
+  it("reports a new project in the selection hash", async () => {
+    const { bridge, control } = createMockBridge(fixtureComp());
+    const before = await bridge.getSelectionHash();
+    control.newProject();
+    const after = await bridge.getSelectionHash();
+    expect(after.project).toBe(before.project + 1);
+    expect((await bridge.getCompTree(2))!.comp.name).toBe("Comp 1");
   });
 });

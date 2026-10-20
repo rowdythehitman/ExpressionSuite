@@ -151,3 +151,47 @@ describe("refresh", () => {
     expect(useIde.getState().tabs[0]!.layerName).toBe("Headline");
   });
 });
+
+describe("reset", () => {
+  it("closes tabs, clears caches and errors, and asks for a refetch", async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().openProperty(POSITION, true);
+    useIde.getState().setStatus({ kind: "error", text: "boom" });
+    const nonce = useIde.getState().refreshNonce;
+    useIde.getState().reset();
+    const s = useIde.getState();
+    expect(s.tabs).toEqual([]);
+    expect(s.activeTab).toBeNull();
+    expect(s.status).toBeNull();
+    expect(s.tree).toBeNull();
+    expect(s.loaded).toEqual({});
+    expect(s.refreshNonce).toBe(nonce + 1);
+    // The next sync re-expands the selection as on first load.
+    await sync();
+    expect(useIde.getState().expanded["100:13:ADBE Transform Group"]).toBe(true);
+  });
+
+  it("summarises AE's error in the status bar and keeps the full text", async () => {
+    control.selectLayers([13]);
+    await sync();
+    await useIde.getState().openProperty(SCALE, true);
+    useIde.getState().updateCode(SCALE, "1;\ntime *");
+    await useIde.getState().apply(SCALE);
+    const { status } = useIde.getState();
+    expect(status?.text).toBe("Title_Text › Scale: Line 2: SyntaxError: Unexpected token");
+    expect(status?.detail).toMatch(/^Expression Disabled\nError at line 2 in property 'Scale'/);
+  });
+});
+
+describe("double click", () => {
+  it("opens one tab when clicks race", async () => {
+    control.selectLayers([13]);
+    await sync();
+    const ide = useIde.getState();
+    await Promise.all([ide.openProperty(POSITION, false), ide.openProperty(POSITION, false), ide.openProperty(POSITION, true)]);
+    const tabs = useIde.getState().tabs;
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]!.preview).toBe(false);
+  });
+});

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { BridgeError, getBridge } from "../bridge";
-import { useIde } from "./store";
+import { isDirty, useIde } from "./store";
 
 const FAST_MS = 300;
 const IDLE_MS = 1000;
@@ -16,6 +16,8 @@ export function useSelectionSync(): void {
   useEffect(() => {
     const bridge = getBridge();
     let lastHash: string | null = null;
+    let lastProject: number | null = null;
+    let lastNonce = useIde.getState().refreshNonce;
     let lastChange = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
@@ -27,8 +29,20 @@ export function useSelectionSync(): void {
     async function tick() {
       if (document.hidden) return schedule(IDLE_MS);
       try {
-        const hash = await bridge.getSelectionHash();
-        if (hash !== lastHash) {
+        const { project, hash } = await bridge.getSelectionHash();
+        const ide = useIde.getState();
+        if (lastProject !== null && project !== lastProject) {
+          // A new or different project: every open tab and cached node belonged to the old one.
+          const dirty = ide.tabs.filter(isDirty).length;
+          ide.reset({
+            kind: "info",
+            text: dirty ? `New project: closed the editor (${dirty} tab${dirty > 1 ? "s" : ""} had unapplied changes).` : "New project: editor reset.",
+          });
+        }
+        lastProject = project;
+        const nonce = useIde.getState().refreshNonce;
+        if (hash !== lastHash || nonce !== lastNonce) {
+          lastNonce = nonce;
           lastHash = hash;
           lastChange = Date.now();
           await useIde.getState().setTree(await bridge.getCompTree(TREE_DEPTH));

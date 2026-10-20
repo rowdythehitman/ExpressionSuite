@@ -49,7 +49,7 @@ test("an AE error after apply squiggles its line and badges the tree", async ({ 
   await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
   await typeInEditor(page, "const s = 50;\n\ns *");
   await page.keyboard.press(`${mod}+S`);
-  await expect(page.getByTestId("status-message")).toContainText("line 3");
+  await expect(page.getByTestId("status-message")).toHaveText("Title_Text › Scale: Line 3: SyntaxError: Unexpected token");
   await expect(row(page, "100:13:ADBE Transform Group/ADBE Scale")).toContainText("⚠");
   await expect(page.locator(".monaco-editor .squiggly-error")).not.toHaveCount(0);
 });
@@ -58,4 +58,31 @@ test("filter finds properties by word prefix", async ({ page }) => {
   await page.getByLabel("Filter properties").fill("rot");
   await expect(row(page, "100:13:ADBE Transform Group/ADBE Rotate Z")).toBeVisible();
   await expect(row(page, "100:13:ADBE Transform Group/ADBE Anchor Point")).toHaveCount(0);
+});
+
+test("a new project closes the editor and clears messages", async ({ page }) => {
+  await row(page, POSITION).dblclick();
+  await typeInEditor(page, "time *");
+  await page.keyboard.press(`${mod}+S`);
+  await expect(page.getByTestId("status-message")).toContainText("SyntaxError");
+  await page.evaluate(() => window.__mockAE!.newProject());
+  await expect(page.getByText("COMP: Comp 1")).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.getByTestId("status-message")).toHaveText("New project: editor reset.");
+  // Same comp/layer ids as before, but the old tab's content is gone.
+  await page.evaluate(() => window.__mockAE!.selectLayers([11]));
+  await page.locator('.row[data-key="100:11:ADBE Transform Group/ADBE Position"]').click();
+  await expect(page.locator(".monaco-editor .view-lines")).not.toContainText("time");
+});
+
+test("reset closes tabs and reloads; messages can be dismissed", async ({ page }) => {
+  await row(page, POSITION).dblclick();
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await page.getByLabel("Reset editor").click();
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(row(page, POSITION)).toBeVisible();
+  await expect(page.getByTestId("status-message")).toContainText("Editor reset");
+  await page.getByLabel("Dismiss message").click();
+  await expect(page.getByTestId("status-message")).toHaveCount(0);
 });

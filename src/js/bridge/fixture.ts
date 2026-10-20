@@ -122,7 +122,9 @@ export function fixtureComp(): MockComp {
             "ADBE Position": { expression: 'wiggle(thisComp.layer("CTRLS").effect("Speed")("Slider"), 20)' },
             "ADBE Rotate Z": {
               expression: "time * 360 +",
-              expressionError: "SyntaxError: Unexpected end of input (line 1)",
+              expressionEnabled: false,
+              expressionError:
+                "Expression Disabled\nError at line 1 in property 'Rotation' of layer 3 ('Title_Text') in comp 'Main_Title'.\nSyntaxError: Unexpected end of input",
             },
             "ADBE Opacity": { expression: "50", expressionEnabled: false },
           }),

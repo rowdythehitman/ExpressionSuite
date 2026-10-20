@@ -1,22 +1,26 @@
 import { useEffect, useRef } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
+import { parseAeError } from "../aeError";
 import { findNode, isDirty, useIde, type Tab } from "../store";
 import { monaco } from "./monaco";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
 export const modelPath = (key: string) => `file:///ide/${encodeURIComponent(key)}.js`;
 
-/** AE reports the failing line in its error text; fall back to no squiggle when it doesn't. */
-export function errorLine(error: string): number | null {
-  const m = /line\s+(\d+)/i.exec(error);
-  return m ? parseInt(m[1]!, 10) : null;
-}
 
 export function EditorArea() {
   const tabs = useIde((s) => s.tabs);
   const activeTab = useIde((s) => s.activeTab);
   const tab = tabs.find((t) => t.key === activeTab);
+
+  // Drop Monaco's model (text, undo history, markers) for any tab that is gone: closed, reset, or a new project.
+  useEffect(() => {
+    const open = new Set(tabs.map((t) => monaco.Uri.parse(modelPath(t.key)).toString()));
+    for (const model of monaco.editor.getModels()) {
+      if (model.uri.path.startsWith("/ide/") && !open.has(model.uri.toString())) model.dispose();
+    }
+  }, [tabs]);
 
   return (
     <div className="editor-area">
@@ -41,7 +45,6 @@ function TabBar({ tabs, activeTab }: { tabs: Tab[]; activeTab: string | null }) 
   const close = (t: Tab) => {
     if (isDirty(t) && !window.confirm(`Discard unapplied changes to ${t.layerName} › ${t.propName}?`)) return;
     closeTab(t.key);
-    monaco.editor.getModel(monaco.Uri.parse(modelPath(t.key)))?.dispose();
   };
   return (
     <div className="tabs" role="tablist">
@@ -129,7 +132,8 @@ function CodeEditor({ tab }: { tab: Tab }) {
     const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
     if (!model) return;
     const shown = tab.error && tab.code === tab.original ? tab.error : null;
-    const line = Math.min(shown ? (errorLine(shown) ?? 1) : 1, model.getLineCount());
+    const parsed = shown ? parseAeError(shown) : null;
+    const line = Math.min(parsed?.line ?? 1, model.getLineCount());
     monaco.editor.setModelMarkers(
       model,
       "after-effects",
@@ -137,7 +141,7 @@ function CodeEditor({ tab }: { tab: Tab }) {
         ? [
             {
               severity: monaco.MarkerSeverity.Error,
-              message: shown,
+              message: parsed!.disabled ? `${parsed!.message}\n(After Effects disabled the expression.)` : parsed!.message,
               startLineNumber: line,
               endLineNumber: line,
               startColumn: 1,

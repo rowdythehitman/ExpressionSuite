@@ -28,10 +28,22 @@ These items cover what only AE can answer. Tick each one off, or note what happe
 - [ ] Typing in Monaco works normally: arrows, Home/End, Cmd/Ctrl+Z inside the editor, copy and paste.
 - [ ] `Ctrl/Cmd+S` applies the expression and does **not** trigger AE's File › Save.
 - [ ] After an apply, **Edit › Undo** names "Expression IDE: Position" and reverts exactly that one apply.
-- [ ] Applying `time *` shows AE's error in the status bar and `⚠` in the tree. **Paste the exact error text here**; it
-      drives the line mapping in phase 2:
+- [x] Applying `time *` shows AE's error in the status bar and `⚠` in the tree. AE 2025's text:
       ```
-      (error text)
+      Expression Disabled
+      Error at line 2 in property 'Anchor Point' of layer 1 ('Dark Yellow Solid 1') in comp 'Comp 1'.
+      SyntaxError: Unexpected token ')'
       ```
 - [ ] A runtime error (`thisComp.layer("Nope")`) also comes back as an error after apply.
 - [ ] Clearing the code and applying removes the expression.
+
+## Phase 1 feedback build
+
+- [ ] A broken expression shows `Line N: SyntaxError: …` in the status bar, with the full AE text on hover, and the
+      squiggle is on line N.
+- [ ] Fixing it and applying again turns the expression back on (the tree row is no longer dimmed, and AE's switch is on).
+- [ ] **File › New Project** closes every tab and shows "New project: editor reset." The tree shows the new project.
+- [ ] **File › Open Project** (another .aep) does the same.
+- [ ] These must **not** reset the editor: **Save**, **Save As**, **Undo/Redo**, deleting a project item, switching comps.
+- [ ] The ↺ button closes all tabs, clears errors and reloads the tree. With unapplied changes it asks first.
+- [ ] The × on a status message dismisses it.

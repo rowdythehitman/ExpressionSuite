@@ -62,3 +62,24 @@ showed a better way. Newest at the bottom.
     `regedit` on the work machine). The same certificate every time lets updates install over the old version. The
     optional `zxp.yml` workflow (manual or on tags) signs with a throwaway certificate on Windows. Its `org` has no
     spaces because vite-cep-plugin passes it to ZXPSignCmd unquoted.
+
+## Phase 1 feedback (first AE run)
+
+21. **AE's error text** (AE 2025) reads `Expression Disabled` / `Error at line N in property '…' of layer N ('…') in comp
+    '…'.` / `SyntaxError: …`. `parseAeError` pulls out the line, the JS error and whether AE disabled the expression.
+    The status bar shows `Line N: SyntaxError: …`, with the full text in its tooltip, and the squiggle carries the JS error.
+    The mock now produces exactly this wording, and like AE it switches an erroring expression off.
+22. **Apply re-enables.** Because AE switches an erroring expression off, each apply turns it back on in the same undo
+    group. If it still fails, AE switches it off again.
+23. **New project resets the editor.** The selection hash carries a project generation. The host bumps it when the root
+    folder it holds from the previous project goes invalid, or when `app.project.revision` drops (it only rises within a
+    project, undo included). On a new generation, the panel closes every tab, drops cached nodes and Monaco models, and
+    says so in the status bar. Save As keeps the same root folder and a rising revision, so it doesn't reset. It's
+    detected from the project, not from comp ids: a new project reuses ids, so old keys would otherwise point at new
+    layers.
+24. **Reset button (↺)** in the explorer header closes all tabs (asking first if any have unapplied changes), clears
+    errors, cached children and expansion, disposes the Monaco models, and refetches from AE. Status messages also get
+    a × to dismiss them.
+25. **Racing opens:** a double click fires several opens before AE answers. The store checks again after the fetch, so
+    only one tab is created.
+

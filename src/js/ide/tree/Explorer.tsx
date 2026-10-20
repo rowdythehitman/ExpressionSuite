@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { parentKey } from "../../../shared/keys";
-import { useIde } from "../store";
+import { isDirty, useIde } from "../store";
 import { flatten, hasExpressionBelow, type Row } from "./flatten";
 
 const ROW_HEIGHT = 22;
@@ -17,7 +17,13 @@ export function Explorer() {
   const selectedKey = useIde((s) => s.selectedKey);
   const activeTab = useIde((s) => s.activeTab);
   const mode = useIde((s) => s.mode);
-  const { toggle, openProperty, select, setFilter, setOnlyExpressions, setMode } = useIde.getState();
+  const { toggle, openProperty, select, setFilter, setOnlyExpressions, setMode, reset } = useIde.getState();
+  const dirtyTabs = useIde((s) => s.tabs.filter(isDirty).length);
+
+  const onReset = () => {
+    if (dirtyTabs && !window.confirm(`Close all tabs? ${dirtyTabs} tab${dirtyTabs > 1 ? "s have" : " has"} unapplied changes.`)) return;
+    reset({ kind: "info", text: "Editor reset: tabs closed, errors cleared, tree reloaded from After Effects." });
+  };
 
   const rows = useMemo(
     () => flatten({ layers: tree?.layers ?? [], loaded, expanded, loading, filter, onlyExpressions }),
@@ -92,6 +98,9 @@ export function Explorer() {
         <span className="explorer-title" title={tree ? `${tree.comp.width}×${tree.comp.height}, ${tree.comp.frameRate}fps` : ""}>
           {tree ? `COMP: ${tree.comp.name}` : "NO COMP"}
         </span>
+        <button className="icon-button" onClick={onReset} title="Reset: close all tabs, clear errors and reload from After Effects" aria-label="Reset editor">
+          ↺
+        </button>
         <div className="segmented" role="group" aria-label="Explorer mode">
           <button className={mode === "selection" ? "on" : ""} onClick={() => setMode("selection")} title="Expand the layers selected in the timeline">
             Selection

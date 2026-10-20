@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, CompTree, TreeNode, ValueType } from "../../shared/types";
+import type { ApplyResult, CompTree, SelectionHash, TreeNode, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -13,6 +13,35 @@ const CLASSIC_3D = "ADBE Advanced 3d";
 // The comp the panel last showed. activeItem is null (or a footage item) whenever focus is on the Project panel,
 // so we keep showing the last comp rather than blanking the tree.
 let lastCompId = 0;
+
+// New-project detection. AE has no project id, so a new or opened project is recognised when the root folder held
+// from the previous one has gone invalid, or when the revision counter (which only rises within a project, undo
+// included) drops. Save As keeps both, so it doesn't count. (Not an item probe: deleting that item would look like
+// a new project.)
+let projectGen = 0;
+let rootProbe: any = null;
+let lastRevision = -1;
+
+function isInvalid(o: any): boolean {
+  try {
+    return o.name === undefined;
+  } catch (_e) {
+    return true;
+  }
+}
+
+function checkProject(): number {
+  const project = app.project as any;
+  const revision = typeof project.revision === "number" ? project.revision : -1;
+  if (rootProbe && (revision < lastRevision || isInvalid(rootProbe))) {
+    projectGen++;
+    lastCompId = 0;
+    rootProbe = null;
+  }
+  if (!rootProbe) rootProbe = project.rootFolder;
+  lastRevision = revision;
+  return projectGen;
+}
 
 function fail(code: string, message: string): never {
   throw new Error(code + ": " + message);
@@ -275,7 +304,12 @@ function layerSignature(layer: Layer): string {
   return parts.join(",");
 }
 
-export const getSelectionHash = (): string => {
+export const getSelectionHash = (): SelectionHash => {
+  const project = checkProject();
+  return { project: project, hash: selectionHash() };
+};
+
+function selectionHash(): string {
   const comp = activeComp();
   if (!comp) return "none";
   const parts: string[] = [String(comp.id), comp.name, String(comp.numLayers)];
@@ -291,9 +325,10 @@ export const getSelectionHash = (): string => {
     parts.push(layer.selected ? layerSignature(layer) : layer.id + "=" + layer.name);
   }
   return parts.join("|");
-};
+}
 
 export const getCompTree = (depth: number): CompTree | null => {
+  checkProject();
   const comp = activeComp();
   if (!comp) return null;
   const selectedKeys: string[] = [];
@@ -337,6 +372,8 @@ export const setExpression = (key: string, code: string): ApplyResult => {
   app.beginUndoGroup("Expression IDE: " + prop.name);
   try {
     prop.expression = code;
+    // AE disables an expression that errored; a new apply turns it back on (AE disables it again if it still fails).
+    if (code !== "" && !prop.expressionEnabled) prop.expressionEnabled = true;
   } catch (e) {
     thrown = String((e as any).message || e);
   } finally {

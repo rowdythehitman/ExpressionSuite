@@ -49,3 +49,10 @@ export interface ApplyResult {
   /** The property as it is now (expression, enabled, error). */
   node: TreeNode;
 }
+
+export interface SelectionHash {
+  /** Bumped when After Effects switches to a new or different project. */
+  project: number;
+  /** Changes when the comp, selection, active property or layer list changes. */
+  hash: string;
+}

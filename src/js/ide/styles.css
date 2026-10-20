@@ -103,6 +103,18 @@ button {
   font-weight: 600;
 }
 
+.icon-button {
+  flex: none;
+  margin-left: auto;
+  padding: 0 4px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.icon-button:hover {
+  color: var(--text);
+}
+
 .segmented {
   display: flex;
   flex: none;
@@ -372,6 +384,28 @@ button {
 .statusbar .message {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.statusbar .message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.statusbar .message > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusbar .dismiss {
+  flex: none;
+  padding: 0 2px;
+  opacity: 0.8;
+}
+
+.statusbar .dismiss:hover {
+  opacity: 1;
 }
 
 .statusbar .message.error {

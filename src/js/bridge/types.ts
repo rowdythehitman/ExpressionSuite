@@ -1,11 +1,11 @@
-import type { ApplyResult, CompTree, TreeNode } from "../../shared/types";
+import type { ApplyResult, CompTree, SelectionHash, TreeNode } from "../../shared/types";
 
-export type { ApplyResult, CompInfo, CompTree, NodeKind, TreeNode, ValueType } from "../../shared/types";
+export type { ApplyResult, CompInfo, CompTree, NodeKind, SelectionHash, TreeNode, ValueType } from "../../shared/types";
 
 /** Everything the panels need from After Effects. The only implementations are cep.ts (real) and mock.ts. */
 export interface Bridge {
-  /** Cheap fingerprint of comp, selection, active property and layer list; polled every 300 ms. */
-  getSelectionHash(): Promise<string>;
+  /** Cheap fingerprint of project, comp, selection, active property and layer list; polled every 300 ms. */
+  getSelectionHash(): Promise<SelectionHash>;
   /** The active comp's layers, or null when no comp is active. `depth` levels below selected layers are loaded. */
   getCompTree(depth: number): Promise<CompTree | null>;
   /** Children of a layer or group, for lazy expansion. */

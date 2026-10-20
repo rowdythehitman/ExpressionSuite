@@ -26,8 +26,10 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
   tab. Unapplied tabs show a dot, and a breadcrumb sits above the code. `Ctrl/Cmd+B` hides the explorer, and the
   splitter resizes it.
 - **Apply:** `Ctrl/Cmd+S` applies the active tab and `Ctrl/Cmd+Alt+S` applies every unapplied tab. Each apply is one undo
-  step (`Expression IDE: Position`). AE's error is read back to the status bar, the tab and the tree, and squiggles
-  the line when AE names one.
+  step (`Expression IDE: Position`) and turns the expression back on if AE had disabled it. AE's error is read back:
+  the status bar shows `Line 2: SyntaxError: …` (full text on hover), the line gets a squiggle, and the tree a `⚠`.
+- **Reset (↺)** closes all tabs, clears errors and reloads the tree. Opening or creating a project does the same
+  automatically.
 
 The next phase brings referencing (drag from the tree, pick from the timeline, the reference generator), AE typings for
 completions, and error line mapping from real AE messages.

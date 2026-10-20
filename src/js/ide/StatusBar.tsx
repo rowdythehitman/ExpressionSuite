@@ -10,7 +10,14 @@ export function StatusBar() {
       {!window.cep && <span className="mock" title="Running in a browser against the fixture comp">MOCK AE</span>}
       <span>{tree ? `${tree.comp.name} · ${selected} selected` : "No comp"}</span>
       {dirty > 0 && <span>{dirty} unapplied</span>}
-      {status && <span className={`message ${status.kind}`} data-testid="status-message">{status.text}</span>}
+      {status && (
+        <span className={`message ${status.kind}`} title={status.detail ?? status.text}>
+          <span data-testid="status-message">{status.text}</span>
+          <button className="dismiss" aria-label="Dismiss message" onClick={() => useIde.getState().setStatus(null)}>
+            ×
+          </button>
+        </span>
+      )}
     </div>
   );
 }

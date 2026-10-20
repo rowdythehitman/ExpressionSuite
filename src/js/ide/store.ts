@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { type Bridge, BridgeError, type CompTree, getBridge, type TreeNode } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
+import { parseAeError } from "./aeError";
 import { childrenOf } from "./tree/flatten";
 
 export type Mode = "selection" | "comp";
@@ -21,6 +22,8 @@ export interface Tab {
 export interface Status {
   text: string;
   kind: "info" | "ok" | "error";
+  /** Full text for the tooltip when `text` is a summary. */
+  detail?: string;
 }
 
 export interface IdeState {
@@ -36,6 +39,8 @@ export interface IdeState {
   tabs: Tab[];
   activeTab: string | null;
   status: Status | null;
+  /** Bumped to make the selection poller refetch the tree even though AE's hash hasn't changed. */
+  refreshNonce: number;
 
   setTree(tree: CompTree | null): Promise<void>;
   toggle(key: string): Promise<void>;
@@ -51,6 +56,8 @@ export interface IdeState {
   apply(key: string): Promise<void>;
   applyAll(): Promise<void>;
   setStatus(status: Status | null): void;
+  /** Closes every tab, forgets cached children, errors and expansion, and refetches from AE. */
+  reset(status?: Status | null): void;
 }
 
 let bridgeOverride: Bridge | null = null;
@@ -189,6 +196,7 @@ export const useIde = create<IdeState>((set, get) => {
     tabs: [],
     activeTab: null,
     status: null,
+    refreshNonce: 0,
 
     async setTree(tree) {
       const prev = get().tree;
@@ -262,6 +270,11 @@ export const useIde = create<IdeState>((set, get) => {
         set({ status: { kind: "error", text: errorText(e) } });
         return;
       }
+      // A double click starts several opens at once; the first to return creates the tab, the rest just focus it.
+      if (get().tabs.some((t) => t.key === key)) {
+        set({ activeTab: key, tabs: get().tabs.map((t) => (t.key === key && pin ? { ...t, preview: false } : t)) });
+        return;
+      }
       const tab = { ...tabFor(key, node), preview: !pin };
       // The new tab replaces a clean preview tab in place.
       const tabs = get().tabs;
@@ -301,7 +314,7 @@ export const useIde = create<IdeState>((set, get) => {
           tabs: get().tabs.map((t) => (t.key === key ? { ...t, original: code, error: res.error } : t)),
           ...replaceNode(get(), res.node),
           status: res.error
-            ? { kind: "error", text: `${label}: ${res.error}` }
+            ? { kind: "error", text: `${label}: ${parseAeError(res.error).summary}`, detail: res.error }
             : { kind: "ok", text: code === "" ? `Removed expression: ${label}` : `Applied: ${label}` },
         });
       } catch (e) {
@@ -314,6 +327,21 @@ export const useIde = create<IdeState>((set, get) => {
     },
 
     setStatus: (status) => set({ status }),
+
+    reset(status = null) {
+      autoExpanded = [];
+      set({
+        tree: null,
+        loaded: {},
+        expanded: {},
+        loading: {},
+        selectedKey: null,
+        tabs: [],
+        activeTab: null,
+        status,
+        refreshNonce: get().refreshNonce + 1,
+      });
+    },
   };
 });
 
