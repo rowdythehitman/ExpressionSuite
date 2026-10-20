@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { parentKey } from "../../../shared/keys";
 import { isDirty, referenceFor, useIde } from "../store";
 import { DRAG_MIME, setDraggingKey } from "../editor/insert";
+import { SettingsMenu } from "../SettingsMenu";
 import { ContextMenu, type MenuAt } from "./ContextMenu";
 import { flatten, hasExpressionBelow, type Row } from "./flatten";
 
@@ -104,6 +105,7 @@ export function Explorer() {
         <span className="explorer-title" title={tree ? `${tree.comp.width}×${tree.comp.height}, ${tree.comp.frameRate}fps` : ""}>
           {tree ? `COMP: ${tree.comp.name}` : "NO COMP"}
         </span>
+        <SettingsMenu />
         <button className="icon-button" onClick={onReset} title="Reset: close all tabs, clear errors and reload from After Effects" aria-label="Reset editor">
           ↺
         </button>

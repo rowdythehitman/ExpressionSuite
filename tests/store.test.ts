@@ -274,6 +274,12 @@ describe("references from the tree", () => {
     await useIde.getState().toggle("100:11:ADBE Effect Parade/ADBE Slider Control"); // load the Slider
   });
 
+  it("references by matchName when the setting is on", async () => {
+    useIde.getState().setSettings({ byMatchName: true });
+    expect(referenceFor(useIde.getState(), SLIDER)?.code).toBe('thisComp.layer("CTRLS").effect("ADBE Slider Control")("ADBE Slider Control-0001")');
+    useIde.getState().setSettings({ byMatchName: false });
+  });
+
   it("writes references relative to the active tab", async () => {
     expect(referenceFor(useIde.getState(), SLIDER)?.code).toBe('thisComp.layer("CTRLS").effect("Speed")("Slider")');
     await useIde.getState().openProperty(POSITION, true);

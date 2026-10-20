@@ -3,6 +3,8 @@ import { getFiles, suggestFileName } from "../bridge/files";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
+import type { Rgb } from "../bridge/panel";
+import { loadSettings, resolvedTheme, saveSettings, type Settings } from "./settings";
 import { checkNames } from "./editor/names";
 import { checkSyntax } from "./editor/syntax";
 import { describeRenames, detectRenames, renameInCode, type Rename } from "./references/rename";
@@ -61,6 +63,9 @@ export interface IdeState {
   expanded: Record<string, boolean>;
   loading: Record<string, boolean>;
   mode: Mode;
+  settings: Settings;
+  /** After Effects' panel background (for theme "ae"). */
+  hostBackground: Rgb;
   /** Pinned layer names, kept across sessions and comps (a CTRLS null is usually called the same everywhere). */
   pinned: string[];
   filter: string;
@@ -92,6 +97,8 @@ export interface IdeState {
   toggle(key: string): Promise<void>;
   setMode(mode: Mode): void;
   togglePin(layerName: string): void;
+  setSettings(patch: Partial<Settings>): void;
+  setHostBackground(rgb: Rgb): void;
   setFilter(filter: string): void;
   setOnlyExpressions(on: boolean): void;
   select(key: string | null): void;
@@ -358,6 +365,8 @@ export const useIde = create<IdeState>((set, get) => {
     loading: {},
     mode: "selection",
     pinned: storedPinned(),
+    settings: loadSettings(),
+    hostBackground: { r: 35, g: 35, b: 35 },
     filter: "",
     onlyExpressions: false,
     selectedKey: null,
@@ -508,6 +517,14 @@ export const useIde = create<IdeState>((set, get) => {
       set({ expanded: { ...get().expanded, [key]: !open } });
       autoExpanded = autoExpanded.filter((k) => k !== key);
       if (!open) await load(key);
+    },
+
+    setHostBackground: (hostBackground) => set({ hostBackground }),
+
+    setSettings(patch) {
+      const settings = { ...get().settings, ...patch };
+      saveSettings(settings);
+      set({ settings });
     },
 
     togglePin(layerName) {
@@ -875,7 +892,7 @@ export function refTargetFor(state: Pick<IdeState, "tree" | "loaded">, key: stri
 
 /** References are written relative to the tab being edited (default: the active one); with none, as from another layer. */
 export function referenceContext(
-  state: Pick<IdeState, "tree" | "activeTab">,
+  state: Pick<IdeState, "tree" | "activeTab"> & { settings?: Settings },
   target: RefTarget,
   fromKey: string | null = state.activeTab,
 ): RefContext {
@@ -887,11 +904,12 @@ export function referenceContext(
     compId: tab?.compId ?? target.compId,
     layerId: tab?.layerId ?? -1,
     duplicateLayerName: sameNamed > 1,
+    byMatchName: !!state.settings?.byMatchName,
   };
 }
 
 export function referenceFor(
-  state: Pick<IdeState, "tree" | "loaded" | "activeTab">,
+  state: Pick<IdeState, "tree" | "loaded" | "activeTab"> & { settings?: Settings },
   key: string,
   fromKey?: string | null,
 ): Reference | null {
@@ -906,6 +924,11 @@ export function batchTargets(state: Pick<IdeState, "tree">, key: string): string
   if (!p || !tree || tree.comp.id !== p.compId || p.segments.length === 0) return [];
   const rest = key.slice(layerKey(p.compId, p.layerId).length);
   return tree.selectedLayerKeys.map((l) => l + rest);
+}
+
+/** "dark" or "light", after following AE when the setting says so. */
+export function themeOf(state: Pick<IdeState, "settings" | "hostBackground">): "dark" | "light" {
+  return resolvedTheme(state.settings.theme, state.hostBackground);
 }
 
 export function isFiltering(s: Pick<IdeState, "filter" | "onlyExpressions">): boolean {

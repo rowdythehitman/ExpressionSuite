@@ -12,8 +12,38 @@
   --ok: #4ec9b0;
   --warn: #e2c08d;
   --error: #f14c4c;
+  --text-strong: #ffffff;
+  --menu-bg: #252526;
+  --menu-border: #454545;
+  --banner-warn-bg: #4d3a12;
+  --banner-warn-fg: #f0d8a8;
+  --banner-info-bg: #12384d;
+  --banner-info-fg: #cfe6f5;
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-code: Consolas, Menlo, Monaco, "Courier New", monospace;
+}
+
+/* Light: AE's brighter Appearance settings, or chosen in ⚙. --bg is AE's own grey when following AE. */
+:root[data-theme="light"] {
+  --bg: #e6e6e6;
+  --bg-sidebar: #f3f3f3;
+  --bg-editor: #ffffff;
+  --bg-hover: #e4e4e4;
+  --bg-selected: #d4e3f3;
+  --bg-active: #c7dff7;
+  --border: #d0d0d0;
+  --text: #222222;
+  --text-dim: #6b6b6b;
+  --text-strong: #000000;
+  --ok: #16825d;
+  --warn: #9a6700;
+  --error: #c62828;
+  --menu-bg: #ffffff;
+  --menu-border: #c8c8c8;
+  --banner-warn-bg: #fff3d6;
+  --banner-warn-fg: #5c4100;
+  --banner-info-bg: #dcefff;
+  --banner-info-fg: #0b3a5c;
 }
 
 * {
@@ -101,6 +131,60 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+
+.settings {
+  position: relative;
+  flex: none;
+  margin-left: auto;
+}
+
+.settings + .icon-button {
+  margin-left: 0;
+}
+
+.settings-popover {
+  position: absolute;
+  z-index: 60;
+  top: 22px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 270px;
+  padding: 10px 12px;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  letter-spacing: normal;
+  font-size: 12px;
+}
+
+.settings-popover label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-popover label.check {
+  justify-content: flex-start;
+}
+
+.settings-popover select,
+.settings-popover input[type="number"] {
+  width: 150px;
+  padding: 2px 4px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.settings-popover input[type="number"] {
+  width: 60px;
 }
 
 .icon-button {
@@ -202,7 +286,7 @@ button {
 }
 
 .row.active .label {
-  color: #fff;
+  color: var(--text-strong);
 }
 
 .row.disabled .label,
@@ -478,8 +562,8 @@ button {
   flex-direction: column;
   min-width: 180px;
   padding: 4px 0;
-  background: #252526;
-  border: 1px solid #454545;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-border);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
@@ -653,8 +737,8 @@ button {
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
-  background: #4d3a12;
-  color: #f0d8a8;
+  background: var(--banner-warn-bg);
+  color: var(--banner-warn-fg);
 }
 
 .rename-banner span,
@@ -666,16 +750,16 @@ button {
 .rename-banner button,
 .conflict button {
   padding: 1px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid currentColor;
   border-radius: 2px;
 }
 
 .rename-banner button:hover,
 .conflict button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(127, 127, 127, 0.2);
 }
 
 .rename-banner {
-  background: #12384d;
-  color: #cfe6f5;
+  background: var(--banner-info-bg);
+  color: var(--banner-info-fg);
 }

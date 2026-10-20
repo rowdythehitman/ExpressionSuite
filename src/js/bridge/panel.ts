@@ -1,5 +1,6 @@
-// CEP panel plumbing that isn't an After Effects call: loading the host script and claiming shortcuts.
-import { csi, initBolt } from "../lib/utils/bolt";
+// CEP panel plumbing that isn't an After Effects call: loading the host script, claiming shortcuts, and AE's UI
+// colour (for "theme follows After Effects").
+import { csi, getAppBackgroundColor, initBolt } from "../lib/utils/bolt";
 
 // Keys the editor needs that AE would otherwise take while the panel has focus (Ctrl/Cmd+S saves the project).
 // Windows uses DOM key codes; macOS CEP uses virtual key codes.
@@ -27,4 +28,42 @@ export function initPanel(): void {
   if (!window.cep) return;
   initBolt();
   registerEditorKeys();
+}
+
+export interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+declare global {
+  interface Window {
+    /** Browser only: simulates AE's Appearance › Brightness changing. */
+    __setHostBackground?: (rgb: Rgb) => void;
+  }
+}
+
+/** AE's default dark UI, used outside CEP. */
+const DEFAULT_BG: Rgb = { r: 35, g: 35, b: 35 };
+
+/** Calls `cb` with AE's panel background now and whenever the user changes AE's brightness; returns an unsubscribe. */
+export function onHostBackground(cb: (rgb: Rgb) => void): () => void {
+  if (!window.cep) {
+    window.__setHostBackground = cb;
+    cb(DEFAULT_BG);
+    return () => {
+      if (window.__setHostBackground === cb) delete window.__setHostBackground;
+    };
+  }
+  const read = () => {
+    try {
+      cb(getAppBackgroundColor().rgb);
+    } catch {
+      cb(DEFAULT_BG);
+    }
+  };
+  read();
+  const event = "com.adobe.csxs.events.ThemeColorChanged";
+  csi.addEventListener(event, read);
+  return () => csi.removeEventListener(event, read);
 }

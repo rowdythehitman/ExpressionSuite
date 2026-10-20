@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { layerKey, parentKey, parseKey } from "../../../shared/keys";
 import { parseAeError } from "../aeError";
-import { batchTargets, findNode, isDirty, namesContext, referenceFor, refTargetFor, useIde, type Tab } from "../store";
+import { batchTargets, findNode, isDirty, namesContext, themeOf, referenceFor, refTargetFor, useIde, type Tab } from "../store";
 import { DRAG_MIME, getDraggingKey, insertDeclaration, insertReference, insertText, setDraggingKey } from "./insert";
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkNames } from "./names";
@@ -67,6 +67,7 @@ export function EditorArea() {
 /** The editor, or, when AE changed the expression under unapplied edits, a banner and an optional diff. */
 function EditorWithConflict({ tab }: { tab: Tab }) {
   const [comparing, setComparing] = useState(false);
+  const theme = useIde(themeOf);
   if (tab.external === undefined) return <CodeEditor tab={tab} />;
   const { resolveExternal } = useIde.getState();
   const pick = (keep: "ae" | "mine") => {
@@ -87,7 +88,7 @@ function EditorWithConflict({ tab }: { tab: Tab }) {
             original={tab.external}
             modified={tab.code}
             language="javascript"
-            theme="ae-dark"
+            theme={theme === "light" ? "ae-light" : "ae-dark"}
             options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false }, automaticLayout: true }}
           />
         </div>
@@ -392,21 +393,29 @@ function CodeEditor({ tab }: { tab: Tab }) {
     );
   }, [tab.key, tab.error, tab.code, tab.original]);
 
+  const settings = useIde((s) => s.settings);
+  const theme = useIde(themeOf) === "light" ? "ae-light" : "ae-dark";
+  // Tab width lives on each model, so it's pushed to all of them.
+  useEffect(() => {
+    for (const m of monaco.editor.getModels()) if (m.uri.path.startsWith("/ide/")) m.updateOptions({ tabSize: settings.tabSize, indentSize: settings.tabSize });
+  }, [settings.tabSize, tab.key]);
+
   return (
     <div className="code" data-testid="code-editor">
       <Editor
         path={modelPath(tab.key)}
         defaultLanguage="javascript"
         defaultValue={tab.code}
-        theme="ae-dark"
+        theme={theme}
         onMount={onMount}
         keepCurrentModel
         onChange={(value) => updateCode(tab.key, value ?? "")}
         options={{
           automaticLayout: true,
           minimap: { enabled: false },
-          fontSize: 13,
-          tabSize: 2,
+          fontSize: settings.fontSize,
+          tabSize: settings.tabSize,
+          detectIndentation: false,
           scrollBeyondLastLine: false,
           renderLineHighlight: "line",
           fixedOverflowWidgets: true,

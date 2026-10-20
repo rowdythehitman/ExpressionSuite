@@ -51,6 +51,19 @@ monaco.editor.defineTheme("ae-dark", {
   },
 });
 
+monaco.editor.defineTheme("ae-light", {
+  base: "vs",
+  inherit: true,
+  rules: [],
+  colors: {
+    "editor.background": "#ffffff",
+  },
+});
+
+export function setEditorTheme(theme: "dark" | "light"): void {
+  monaco.editor.setTheme(theme === "light" ? "ae-light" : "ae-dark");
+}
+
 loader.config({ monaco });
 
 export { monaco };

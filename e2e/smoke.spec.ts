@@ -357,3 +357,20 @@ test("Ctrl-drop declares layer + property and uses it at the drop point", async 
   await expect(page.locator(".monaco-editor .view-lines")).toContainText("value * ctrlsSpeed + ctrlsSpeed");
   await expect(lines).toHaveCount(2);
 });
+
+test("settings: theme follows AE or is chosen; font size applies", async ({ page }) => {
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  // AE's Appearance › Brightness turned up.
+  await page.evaluate(() => window.__setHostBackground!({ r: 205, g: 205, b: 205 }));
+  await expect(html).toHaveAttribute("data-theme", "light");
+  await page.getByLabel("Settings", { exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
+  await dialog.getByLabel("Theme").selectOption("dark");
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await dialog.getByLabel("Font size").fill("18");
+  await row(page, POSITION).click();
+  await expect(page.locator(".monaco-editor .view-lines")).toHaveCSS("font-size", "18px");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-theme", "dark"); // remembered
+});
