@@ -12,6 +12,8 @@ export interface MockControl {
   selectProperty(key: string | null): void;
   /** Rename a layer, as if done in AE. */
   renameLayer(id: number, name: string): void;
+  /** Rename an effect on a layer, as if done in AE. */
+  renameEffect(layerId: number, from: string, to: string): void;
   /** Change an expression behind the panel's back, as if typed in the timeline. */
   setExpressionInAE(key: string, code: string): void;
   getExpression(key: string): string;
@@ -367,6 +369,12 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
     renameLayer(id, name) {
       const layer = comp.layers.find((l) => l.id === id);
       if (layer) layer.name = name;
+    },
+    renameEffect(layerId, from, to) {
+      const layer = comp.layers.find((l) => l.id === layerId);
+      const fx = layer?.children.find((c) => c.matchName === "ADBE Effect Parade")?.children?.find((c) => c.name === from);
+      if (fx) fx.name = to;
+      version++;
     },
     setExpressionInAE(key, code) {
       findProperty(key).expression = code;

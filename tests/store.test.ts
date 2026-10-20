@@ -455,3 +455,49 @@ describe("changes made in After Effects", () => {
     expect(canAutoApply(t)).toBe(false);
   });
 });
+
+describe("renames", () => {
+  async function fullSync() {
+    await useIde.getState().setTree(await bridge.getCompTree(2));
+    await useIde.getState().setSchema(await bridge.getCompSchema());
+  }
+
+  beforeEach(async () => {
+    control.selectLayers([13]);
+    await fullSync();
+  });
+
+  it("offers to update open tabs and the comp when a layer is renamed", async () => {
+    await useIde.getState().openProperty(POSITION, true);
+    useIde.getState().updateCode(POSITION, 'thisComp.layer("CTRLS").transform.position');
+    control.renameLayer(11, "Controls");
+    await fullSync();
+    const offer = useIde.getState().renameOffer!;
+    expect(offer.summary).toBe("Layer “CTRLS” → “Controls”");
+    // The tab's edit, plus the comp's applied Position and Source Text expressions.
+    expect([offer.tabCount, offer.compCount]).toEqual([1, 2]);
+
+    await useIde.getState().applyRenames("all");
+    expect(control.getExpression(POSITION)).toBe('wiggle(thisComp.layer("Controls").effect("Speed")("Slider"), 20)');
+    expect(control.getExpression("100:13:ADBE Text Properties/ADBE Text Document")).toBe('thisComp.layer("Controls").name');
+    expect(control.undoGroups()).toEqual(["Expression IDE: update references (Layer “CTRLS” → “Controls”)"]);
+    expect(useIde.getState().tabs[0]!.code).toBe('thisComp.layer("Controls").transform.position');
+    expect(useIde.getState().renameOffer).toBeNull();
+  });
+
+  it("handles effect renames, and only open tabs when asked", async () => {
+    await useIde.getState().openProperty(POSITION, true);
+    control.renameEffect(11, "Speed", "Pace");
+    await fullSync();
+    expect(useIde.getState().renameOffer).toMatchObject({ summary: "Effect “Speed” → “Pace” on CTRLS", tabCount: 1, compCount: 1 });
+    await useIde.getState().applyRenames("tabs");
+    expect(useIde.getState().tabs[0]!.code).toBe('wiggle(thisComp.layer("CTRLS").effect("Pace")("Slider"), 20)');
+    expect(control.getExpression(POSITION)).toContain('effect("Speed")'); // AE untouched
+  });
+
+  it("offers nothing when no expression uses the old name", async () => {
+    control.renameLayer(12, "Brand");
+    await fullSync();
+    expect(useIde.getState().renameOffer).toBeNull();
+  });
+});

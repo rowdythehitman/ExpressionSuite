@@ -49,7 +49,7 @@ export function useSelectionSync(): void {
           lastHash = hash;
           lastChange = Date.now();
           await useIde.getState().setTree(await bridge.getCompTree(TREE_DEPTH));
-          useIde.getState().setSchema(await bridge.getCompSchema());
+          await useIde.getState().setSchema(await bridge.getCompSchema());
           void useIde.getState().refreshProblems();
         }
         // Open tabs follow changes made in AE (timeline edits, AE's own rename updates): on tree changes and every

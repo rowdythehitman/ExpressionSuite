@@ -295,3 +295,15 @@ test("a clean tab picks up a change made in AE", async ({ page }) => {
   await expect(page.locator(".monaco-editor .view-lines")).toContainText("[7, 7]");
   await expect(page.getByTestId("status-message")).toHaveText("Updated from After Effects: Title_Text › Position");
 });
+
+test("renaming a layer offers to update references", async ({ page }) => {
+  await row(page, POSITION).dblclick();
+  await page.evaluate(() => window.__mockAE!.renameLayer(11, "Controls"));
+  const banner = page.getByRole("status", { name: "Renamed" });
+  await expect(banner).toContainText("Layer “CTRLS” → “Controls”");
+  await expect(banner).toContainText("1 reference in open tabs, 2 references in this comp");
+  await banner.getByRole("button", { name: "Update everywhere" }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("Controls")');
+  expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), POSITION)).toContain('layer("Controls")');
+});

@@ -611,6 +611,7 @@ button {
   color: var(--text);
 }
 
+.rename-banner,
 .conflict {
   display: flex;
   flex: none;
@@ -622,17 +623,25 @@ button {
   color: #f0d8a8;
 }
 
+.rename-banner span,
 .conflict span {
   flex: 1;
   min-width: 200px;
 }
 
+.rename-banner button,
 .conflict button {
   padding: 1px 8px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 2px;
 }
 
+.rename-banner button:hover,
 .conflict button:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.rename-banner {
+  background: #12384d;
+  color: #cfe6f5;
 }

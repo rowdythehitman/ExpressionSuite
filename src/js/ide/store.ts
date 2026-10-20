@@ -4,6 +4,7 @@ import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
 import { checkNames } from "./editor/names";
 import { checkSyntax } from "./editor/syntax";
+import { describeRenames, detectRenames, renameInCode, type Rename } from "./references/rename";
 import { generateReference, type RefContext, type RefTarget, type Reference } from "./references/reference";
 import { childrenOf } from "./tree/flatten";
 
@@ -27,6 +28,14 @@ export interface Tab {
   external?: string;
 }
 
+export interface RenameOffer {
+  renames: Rename[];
+  summary: string;
+  /** References to old names in open tabs, and in the comp's applied expressions. */
+  tabCount: number;
+  compCount: number;
+}
+
 export interface Status {
   text: string;
   kind: "info" | "ok" | "error";
@@ -36,6 +45,8 @@ export interface Status {
 
 export interface IdeState {
   tree: CompTree | null;
+  /** Layers or effects just renamed while expressions still use the old names (spec: Rename safety). */
+  renameOffer: RenameOffer | null;
   /** Every expression in the comp, from the last scan (spec: Problems list). Null until scanned. */
   problems: ExpressionScan | null;
   problemsOpen: boolean;
@@ -64,7 +75,10 @@ export interface IdeState {
   refreshNonce: number;
 
   setTree(tree: CompTree | null): Promise<void>;
-  setSchema(schema: CompSchema | null): void;
+  setSchema(schema: CompSchema | null): Promise<void>;
+  /** Rewrites old names: in open tabs only, or also in every expression in the comp (one undo step). */
+  applyRenames(scope: "tabs" | "all"): Promise<void>;
+  dismissRenames(): void;
   setProblemsOpen(open: boolean): void;
   /** Rescans the comp's expressions; a no-op while the Problems panel is closed, unless forced. */
   refreshProblems(force?: boolean): Promise<void>;
@@ -265,6 +279,38 @@ export const useIde = create<IdeState>((set, get) => {
     }
   }
 
+  /** Open tabs (in the schema's comp) whose code still uses old names, with the rewritten code. */
+  function tabRenames(state: IdeState, renames: Rename[]): { key: string; code: string; count: number }[] {
+    const schema = state.schema;
+    if (!schema) return [];
+    const out: { key: string; code: string; count: number }[] = [];
+    for (const t of state.tabs) {
+      const p = parseKey(t.key);
+      if (!p || p.compId !== schema.compId) continue;
+      const r = renameInCode(t.code, renames, { compName: schema.compName, layerId: p.layerId });
+      if (r.count) out.push({ key: t.key, ...r });
+    }
+    return out;
+  }
+
+  /** The comp's applied expressions that still use old names, with the rewritten code. */
+  async function compRenames(renames: Rename[]): Promise<{ key: string; code: string; count: number }[]> {
+    const schema = get().schema;
+    if (!schema) return [];
+    let scan: ExpressionScan | null;
+    try {
+      scan = await bridge().findAllExpressions();
+    } catch {
+      return [];
+    }
+    const out: { key: string; code: string; count: number }[] = [];
+    for (const e of scan?.entries ?? []) {
+      const r = renameInCode(e.expression, renames, { compName: schema.compName, layerId: parseKey(e.key)?.layerId ?? null });
+      if (r.count) out.push({ key: e.key, ...r });
+    }
+    return out;
+  }
+
   function tabFor(key: string, node: TreeNode): Tab {
     const p = parseKey(key);
     const layer = p ? findNode(get(), layerKey(p.compId, p.layerId)) : undefined;
@@ -286,6 +332,7 @@ export const useIde = create<IdeState>((set, get) => {
     reading: null,
     problems: null,
     problemsOpen: false,
+    renameOffer: null,
     loaded: {},
     expanded: {},
     loading: {},
@@ -351,7 +398,54 @@ export const useIde = create<IdeState>((set, get) => {
       await loadExpanded();
     },
 
-    setSchema: (schema) => set({ schema }),
+    async setSchema(schema) {
+      const prev = get().schema;
+      set({ schema });
+      if (!prev || !schema) return;
+      const renames = detectRenames(prev, schema);
+      if (renames.length === 0) return;
+      // Merge with an offer still showing, so two quick renames are handled together.
+      const all = [...(get().renameOffer?.renames ?? []), ...renames];
+      const tabCount = tabRenames(get(), all).reduce((n, r) => n + r.count, 0);
+      const compCount = (await compRenames(all)).reduce((n, r) => n + r.count, 0);
+      // AE may already have rewritten everything itself; then there's nothing to offer.
+      set({ renameOffer: tabCount + compCount > 0 ? { renames: all, summary: describeRenames(all), tabCount, compCount } : null });
+    },
+
+    async applyRenames(scope) {
+      const offer = get().renameOffer;
+      if (!offer) return;
+      set({ renameOffer: null });
+      let compDone = 0;
+      if (scope === "all") {
+        const edits = await compRenames(offer.renames);
+        if (edits.length) {
+          try {
+            await bridge().setExpressions(
+              edits.map((e) => ({ key: e.key, code: e.code })),
+              `Expression IDE: update references (${offer.summary})`,
+            );
+            compDone = edits.reduce((n, e) => n + e.count, 0);
+          } catch (e) {
+            set({ status: { kind: "error", text: errorText(e) } });
+            return;
+          }
+          await get().syncTabs(); // clean tabs pick up the rewritten expressions
+        }
+      }
+      const tabEdits = tabRenames(get(), offer.renames);
+      for (const e of tabEdits) get().updateCode(e.key, e.code);
+      const tabDone = tabEdits.reduce((n, e) => n + e.count, 0);
+      set({
+        status: {
+          kind: "ok",
+          text: `Updated ${tabDone} reference${tabDone === 1 ? "" : "s"} in open tabs${scope === "all" ? ` and ${compDone} in the comp` : ""}.`,
+        },
+      });
+      void get().refreshProblems();
+    },
+
+    dismissRenames: () => set({ renameOffer: null }),
 
     setProblemsOpen(open) {
       set({ problemsOpen: open });
@@ -623,6 +717,7 @@ export const useIde = create<IdeState>((set, get) => {
         schema: null,
         reading: null,
         problems: null,
+        renameOffer: null,
         loaded: {},
         expanded: {},
         loading: {},
