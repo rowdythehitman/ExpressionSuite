@@ -17,6 +17,7 @@ export function useSelectionSync(): void {
     const bridge = getBridge();
     let lastHash: string | null = null;
     let lastProject: number | null = null;
+    let lastTime: number | null = null;
     let lastNonce = useIde.getState().refreshNonce;
     let lastChange = Date.now();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -29,7 +30,7 @@ export function useSelectionSync(): void {
     async function tick() {
       if (document.hidden) return schedule(IDLE_MS);
       try {
-        const { project, hash } = await bridge.getSelectionHash();
+        const { project, hash, time } = await bridge.getSelectionHash();
         const ide = useIde.getState();
         if (lastProject !== null && project !== lastProject) {
           // A new or different project: every open tab and cached node belonged to the old one.
@@ -41,12 +42,19 @@ export function useSelectionSync(): void {
         }
         lastProject = project;
         const nonce = useIde.getState().refreshNonce;
-        if (hash !== lastHash || nonce !== lastNonce) {
+        const treeChanged = hash !== lastHash || nonce !== lastNonce;
+        if (treeChanged) {
           lastNonce = nonce;
           lastHash = hash;
           lastChange = Date.now();
           await useIde.getState().setTree(await bridge.getCompTree(TREE_DEPTH));
           useIde.getState().setSchema(await bridge.getCompSchema());
+        }
+        // The playhead moved (or the tree changed): re-read the value strip. Scrubbing counts as activity.
+        if (time !== lastTime || treeChanged) {
+          if (time !== lastTime) lastChange = Date.now();
+          lastTime = time;
+          void useIde.getState().refreshValue();
         }
       } catch (e) {
         lastHash = null; // retry the full fetch next time

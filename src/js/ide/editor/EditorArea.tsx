@@ -6,6 +6,7 @@ import { findNode, isDirty, referenceFor, refTargetFor, useIde, type Tab } from 
 import { DRAG_MIME, getDraggingKey, insertConst, insertReference, insertText, setDraggingKey } from "./insert";
 import { monaco, setCompSchema, setValueType } from "./monaco";
 import { checkSyntax } from "./syntax";
+import { ValueStrip } from "./ValueStrip";
 
 /** One Monaco model per property; the URI must be a valid path, so the key is encoded. */
 export const modelPath = (key: string) => `file:///ide/${encodeURIComponent(key)}.js`;
@@ -31,6 +32,7 @@ export function EditorArea() {
         <>
           <Breadcrumb tabKey={tab.key} />
           <CodeEditor tab={tab} />
+          <ValueStrip tabKey={tab.key} valueType={tab.valueType} />
         </>
       ) : (
         <div className="empty editor-empty">

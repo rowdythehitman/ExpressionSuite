@@ -291,3 +291,22 @@ describe("references from the tree", () => {
     expect(control.undoGroups()).toEqual(["Disable expression: Position", "Expression IDE: Position"]);
   });
 });
+
+describe("value strip", () => {
+  it("reads the active tab's value at the playhead, and the expression's error", async () => {
+    control.selectLayers([13]);
+    await sync();
+    const ide = useIde.getState();
+    await ide.openProperty(SCALE, true);
+    await ide.refreshValue();
+    expect(useIde.getState().reading).toEqual({ key: SCALE, reading: { time: 0, value: [100, 100] } });
+    control.setTime(2);
+    control.setValue(SCALE, [50, 50]);
+    await ide.refreshValue();
+    expect(useIde.getState().reading?.reading).toEqual({ time: 2, value: [50, 50] });
+    await ide.openProperty("100:13:ADBE Transform Group/ADBE Rotate Z", true);
+    await ide.setExpressionEnabled("100:13:ADBE Transform Group/ADBE Rotate Z", true);
+    await ide.refreshValue();
+    expect(useIde.getState().reading?.reading.error).toMatch(/SyntaxError/);
+  });
+});

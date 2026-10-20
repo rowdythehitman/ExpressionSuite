@@ -3,7 +3,7 @@
 // Errors are thrown as "CODE: message" and turned into typed BridgeErrors by src/js/bridge/cep.ts.
 
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
-import type { ApplyResult, CompSchema, CompTree, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueType } from "../../shared/types";
+import type { ApplyResult, CompSchema, CompTree, RefSegment, RefTarget, SchemaEffect, SchemaLayer, SelectionHash, TreeNode, ValueReading, ValueType } from "../../shared/types";
 
 /** How many properties a group scan may visit before it gives up and assumes "scriptable, no expression". */
 const SCAN_BUDGET_SELECTED = 400;
@@ -306,7 +306,8 @@ function layerSignature(layer: Layer): string {
 
 export const getSelectionHash = (): SelectionHash => {
   const project = checkProject();
-  return { project: project, hash: selectionHash() };
+  const comp = activeComp();
+  return { project: project, time: comp ? comp.time : 0, hash: selectionHash() };
 };
 
 function selectionHash(): string {
@@ -467,4 +468,21 @@ export const getCompSchema = (): CompSchema | null => {
     layers.push({ id: layer.id, index: layer.index, name: layer.name, effects: effects });
   }
   return { compId: comp.id, compName: comp.name, layers: layers };
+};
+
+export const getValueAtTime = (key: string, time?: number): ValueReading => {
+  const r = resolveProperty(key);
+  const t = typeof time === "number" ? time : r.comp.time;
+  let v: any;
+  try {
+    v = r.prop.valueAtTime(t, false);
+  } catch (e) {
+    return { time: t, value: null, error: String((e as any).message || e) };
+  }
+  let value: number | number[] | string | null = null;
+  if (typeof v === "number" || typeof v === "string") value = v;
+  else if (v instanceof Array) value = v;
+  else if (r.prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT && v) value = String(v.text);
+  else if (r.prop.propertyValueType === PropertyValueType.SHAPE && v) value = "Path (" + v.vertices.length + " points" + (v.closed ? ", closed" : "") + ")";
+  return { time: t, value: value };
 };

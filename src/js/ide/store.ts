@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { type Bridge, BridgeError, type CompSchema, type CompTree, getBridge, type TreeNode, type ValueType } from "../bridge";
+import { type Bridge, BridgeError, type CompSchema, type CompTree, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
 import { checkSyntax } from "./editor/syntax";
@@ -32,6 +32,8 @@ export interface Status {
 
 export interface IdeState {
   tree: CompTree | null;
+  /** The active tab's evaluated value at the playhead (spec: Value strip). */
+  reading: { key: string; reading: ValueReading } | null;
   /** Layer, effect and parameter names of the active comp, for completions. */
   schema: CompSchema | null;
   loaded: Record<string, TreeNode[]>;
@@ -52,6 +54,8 @@ export interface IdeState {
 
   setTree(tree: CompTree | null): Promise<void>;
   setSchema(schema: CompSchema | null): void;
+  /** Re-reads the active tab's value; called on tab change, after apply and when the playhead moves. */
+  refreshValue(): Promise<void>;
   toggle(key: string): Promise<void>;
   setMode(mode: Mode): void;
   setFilter(filter: string): void;
@@ -232,6 +236,7 @@ export const useIde = create<IdeState>((set, get) => {
   return {
     tree: null,
     schema: null,
+    reading: null,
     loaded: {},
     expanded: {},
     loading: {},
@@ -289,6 +294,21 @@ export const useIde = create<IdeState>((set, get) => {
     },
 
     setSchema: (schema) => set({ schema }),
+
+    async refreshValue() {
+      const key = get().activeTab;
+      if (!key) {
+        if (get().reading) set({ reading: null });
+        return;
+      }
+      try {
+        const reading = await bridge().getValueAtTime(key);
+        if (get().activeTab === key) set({ reading: { key, reading } });
+      } catch {
+        // The tab's property is gone (deleted layer, new project); the strip just goes blank.
+        if (get().activeTab === key) set({ reading: null });
+      }
+    },
 
     async toggle(key) {
       const open = !!get().expanded[key] || (get().expanded[key] === undefined && isFiltering(get()));
@@ -389,6 +409,7 @@ export const useIde = create<IdeState>((set, get) => {
             ? { kind: "error", text: `${label}: ${parseAeError(res.error).summary}`, detail: res.error }
             : { kind: "ok", text: code === "" ? `Removed expression: ${label}` : `${auto ? "Auto-applied" : "Applied"}: ${label}` },
         });
+        if (get().activeTab === key) get().refreshValue();
       } catch (e) {
         set({ status: { kind: "error", text: `${label}: ${errorText(e)}` } });
       }
@@ -451,6 +472,7 @@ export const useIde = create<IdeState>((set, get) => {
       set({
         tree: null,
         schema: null,
+        reading: null,
         loaded: {},
         expanded: {},
         loading: {},

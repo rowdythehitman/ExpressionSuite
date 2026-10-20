@@ -53,6 +53,8 @@ export interface ApplyResult {
 export interface SelectionHash {
   /** Bumped when After Effects switches to a new or different project. */
   project: number;
+  /** The active comp's current time (the playhead), so the value strip can follow it without refetching the tree. */
+  time: number;
   /** Changes when the comp, selection, active property or layer list changes. */
   hash: string;
 }
@@ -93,4 +95,13 @@ export interface SchemaEffect {
   name: string;
   matchName: string;
   params: { name: string; valueType: ValueType }[];
+}
+
+/** A property's evaluated value (after its expression) at a time. */
+export interface ValueReading {
+  time: number;
+  /** Numbers, arrays (vectors, colours), text for Source Text, a summary for paths; null when it can't be shown. */
+  value: number | number[] | string | null;
+  /** Evaluation failed (usually the expression's own error). */
+  error?: string;
 }

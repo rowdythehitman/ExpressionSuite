@@ -206,3 +206,22 @@ test("completes real layer, effect and parameter names", async ({ page }) => {
   await ask('thisComp.layer("CTRLS").effect("', "Speed");
   await ask('thisComp.layer("CTRLS").effect("Speed")("', "Slider");
 });
+
+test("value strip follows the playhead and shows colours", async ({ page }) => {
+  await row(page, "100:13:ADBE Transform Group/ADBE Scale").dblclick();
+  const strip = page.getByTestId("value-strip");
+  await expect(strip).toContainText("Value at 0:00:00:00");
+  await expect(strip).toContainText("100");
+  await page.evaluate(() => {
+    window.__mockAE!.setValue("100:13:ADBE Transform Group/ADBE Scale", [42, 43]);
+    window.__mockAE!.setTime(1.48);
+  });
+  await expect(strip).toContainText("Value at 0:00:01:12");
+  await expect(strip).toContainText("42");
+  await expect(strip).toContainText("43");
+
+  await page.evaluate(() => window.__mockAE!.selectLayers([11]));
+  await row(page, "100:11:ADBE Effect Parade/ADBE Color Control").click();
+  await row(page, "100:11:ADBE Effect Parade/ADBE Color Control/ADBE Color Control-0001").click();
+  await expect(strip.locator(".swatch")).toBeVisible();
+});
