@@ -444,3 +444,20 @@ test("snippets insert code and create their controls", async ({ page }) => {
   await expect(page.getByTestId("status-message")).toHaveText("Added 2 controls (Frequency, Amplitude) on Title_Text.");
   await expect(page.locator('.row:has-text("Frequency")')).toBeVisible();
 });
+
+test("find references from the tree; Ctrl-click a reference to go to it", async ({ page }) => {
+  await showSlider(page);
+  await row(page, SLIDER).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Find references" }).click();
+  const panel = page.getByRole("region", { name: "References" });
+  await expect(panel).toContainText("REFERENCES to CTRLS › Speed › Slider · 1 in 1 expression");
+  await panel.getByRole("button", { name: /Title_Text › Transform › Position/ }).click();
+  await expect(page.getByRole("tab", { name: /Title_Text › Position/ })).toBeVisible();
+
+  // Ctrl-click "Speed" inside the reference.
+  await row(page, "100:11").click(); // collapse CTRLS, so the reveal has to reopen it
+  await page.keyboard.down("Control");
+  await page.locator(".monaco-editor .view-lines").getByText('"Speed"').click();
+  await page.keyboard.up("Control");
+  await expect(page.locator(`.row.selected[data-key="${SLIDER}"]`)).toBeVisible();
+});

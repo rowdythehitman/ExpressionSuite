@@ -5,6 +5,7 @@ import { setEditorTheme } from "./editor/monaco";
 import { themeOf, useIde } from "./store";
 import { Explorer } from "./tree/Explorer";
 import { Problems } from "./Problems";
+import { References } from "./References";
 import { RenameBanner } from "./RenameBanner";
 import { StatusBar } from "./StatusBar";
 import { useSelectionSync } from "./useSelectionSync";
@@ -102,6 +103,7 @@ export function App() {
         <div className="workspace">
           <RenameBanner />
           <EditorArea />
+          <References />
           <Problems />
         </div>
       </div>

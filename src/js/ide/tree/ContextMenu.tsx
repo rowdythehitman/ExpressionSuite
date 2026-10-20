@@ -23,6 +23,7 @@ function itemsFor(node: TreeNode): Item[] {
     ide.setStatus({ kind: "info", text: ref.warning ?? `Copied ${ref.code}` });
   };
   const items: Item[] = [{ label: node.kind === "layer" ? "Copy layer reference" : "Copy reference", run: copy }];
+  if (node.kind !== "layer") items.push({ label: "Find references", run: () => ide.findReferences(node.key) });
   if (node.kind === "property" && node.expression) {
     items.push(
       node.expressionEnabled === false

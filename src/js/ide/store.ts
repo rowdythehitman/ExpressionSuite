@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { getFiles, suggestFileName } from "../bridge/files";
 import type { RefPath, ValueSamples } from "../bridge";
+import { referenceChains, usesTarget } from "./references/usage";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
 import { parseAeError } from "./aeError";
@@ -35,6 +36,22 @@ export interface Tab {
   external?: string;
   /** A .js file this tab is linked to: saving the file applies it; applying here writes it (spec: File watch mode). */
   linkedFile?: string;
+}
+
+export interface ReferenceResult {
+  key: string;
+  layerIndex: number;
+  layerName: string;
+  path: string[];
+  line: number;
+  /** The line's code, trimmed. */
+  text: string;
+}
+
+export interface ReferenceResults {
+  label: string;
+  results: ReferenceResult[];
+  truncated: boolean;
 }
 
 export interface RenameOffer {
@@ -105,6 +122,17 @@ export interface IdeState {
   makeControl(tabKey: string, c: Controllable, onPinned: boolean): Promise<Reference | null>;
   /** Creates a snippet's controls on the tab's layer and queues its code for insertion at the cursor. */
   insertSnippet(tabKey: string, snippetId: string): Promise<void>;
+  /** Results of the last Find references (null when the panel is closed). */
+  references: ReferenceResults | null;
+  /** Lists every expression in the comp that uses `key` (or something inside it). */
+  findReferences(key: string): Promise<void>;
+  closeReferences(): void;
+  /** Jumps to what a reference in a tab's code points at: reveals it in the tree and selects it in the timeline. */
+  goToDefinition(tabKey: string, path: RefPath): Promise<void>;
+  /** Opens a property's tab with the cursor on a line (from the references list). */
+  openAtLine(key: string, line: number): Promise<void>;
+  /** A cursor move waiting for a tab's editor. */
+  pendingCursor: { key: string; line: number; nonce: number } | null;
   /** Text waiting to be inserted into a tab's editor at the cursor (snippets); the editor takes it and clears it. */
   pendingInsert: { key: string; text: string; nonce: number } | null;
   clearPendingInsert(): void;
@@ -520,6 +548,8 @@ export const useIde = create<IdeState>((set, get) => {
     problemsOpen: false,
     renameOffer: null,
     pendingInsert: null,
+    references: null,
+    pendingCursor: null,
     loaded: {},
     expanded: {},
     loading: {},
@@ -675,6 +705,58 @@ export const useIde = create<IdeState>((set, get) => {
     },
 
     clearPendingInsert: () => set({ pendingInsert: null }),
+
+    async findReferences(key) {
+      const state = get();
+      const tree = state.tree;
+      const p = parseKey(key);
+      const target = refTargetFor(state, key);
+      if (!tree || !p || !target) return;
+      let scan: ExpressionScan | null;
+      try {
+        scan = await bridge().findAllExpressions();
+      } catch (e) {
+        set({ status: { kind: "error", text: errorText(e) } });
+        return;
+      }
+      const layers = tree.layers.map((l) => ({ id: parseKey(l.key)!.layerId, index: l.index ?? 0, name: l.name }));
+      const results: ReferenceResult[] = [];
+      for (const e of scan?.entries ?? []) {
+        const ctx = { compName: tree.comp.name, layerId: parseKey(e.key)!.layerId, layers };
+        const lines = e.expression.split("\n");
+        for (const c of referenceChains(e.expression)) {
+          if (!usesTarget(c.path, ctx, { layerId: p.layerId, path: target.path })) continue;
+          results.push({ key: e.key, layerIndex: e.layerIndex, layerName: e.layerName, path: e.path, line: c.line, text: (lines[c.line - 1] ?? "").trim() });
+        }
+      }
+      const label = [target.layerName, ...target.path.filter((s) => s.matchName !== "ADBE Effect Parade").map((s) => s.name)].join(" › ");
+      set({ references: { label, results, truncated: !!scan?.truncated } });
+    },
+
+    closeReferences: () => set({ references: null }),
+
+    async goToDefinition(tabKey, path) {
+      const p = parseKey(tabKey);
+      if (!p) return;
+      let key: string | null;
+      try {
+        key = await bridge().resolveReferenceKey(p.compId, p.layerId, path);
+      } catch {
+        key = null;
+      }
+      if (!key) {
+        set({ status: { kind: "info", text: "That reference doesn't point at anything in this comp." } });
+        return;
+      }
+      await get().revealInTree(key);
+      void get().revealInTimeline(key);
+    },
+
+    async openAtLine(key, line) {
+      await get().revealInTree(key);
+      await get().openProperty(key, true);
+      set({ pendingCursor: { key, line, nonce: Date.now() } });
+    },
 
     async sampleValues(key) {
       try {
@@ -1066,6 +1148,7 @@ export const useIde = create<IdeState>((set, get) => {
         reading: null,
         problems: null,
         renameOffer: null,
+        references: null,
         loaded: {},
         expanded: {},
         loading: {},

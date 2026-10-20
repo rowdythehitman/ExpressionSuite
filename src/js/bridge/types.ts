@@ -29,6 +29,8 @@ export interface Bridge {
   getValueAtTime(key: string, time?: number): Promise<ValueReading>;
   /** Values of references written in code, for showing them inline; null where one doesn't resolve. */
   readReferences(compId: number, layerId: number, paths: RefPath[]): Promise<(ValueReading | null)[]>;
+  /** The tree key of what a reference in code points at (go to definition); null if it doesn't resolve. */
+  resolveReferenceKey(compId: number, layerId: number, path: RefPath): Promise<string | null>;
   /** The property's value at `count` times across the comp's work area (value graph). */
   sampleValues(key: string, count: number): Promise<ValueSamples>;
   /** Adds an expression control to a layer, set to `value`, as one undo step; resolves to the effect's name. */

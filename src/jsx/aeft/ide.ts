@@ -544,40 +544,53 @@ export const getValueAtTime = (key: string, time?: number): ValueReading => {
 
 /** Values of references written in code (see src/js/ide/references/resolve.ts), at the comp's current time. Null
  * for any that don't resolve (a typo, a layer that isn't there). */
+/** Follows a reference path (see src/js/ide/references/resolve.ts) to its property or group, or null. */
+function follow(home: CompItem, layerId: number, path: RefPath): { comp: CompItem; target: any } | null {
+  let comp: CompItem = home;
+  if (path.comp) {
+    let found: CompItem | null = null;
+    for (let j = 1; j <= app.project.numItems && !found; j++) {
+      const item = app.project.item(j);
+      if (item instanceof CompItem && item.name === path.comp) found = item;
+    }
+    if (!found) return null;
+    comp = found;
+  }
+  const l: any = path.layer;
+  let cur: any = l.self ? app.project.layerByID(layerId) : typeof l.index === "number" ? comp.layer(l.index) : comp.layer(l.name);
+  for (let s = 0; s < path.steps.length && cur; s++) {
+    const step: any = path.steps[s];
+    const options: string[] = step instanceof Array ? step : [step];
+    let next: any = null;
+    for (let k = 0; k < options.length && !next; k++) next = cur.property(options[k]);
+    cur = next;
+  }
+  return cur ? { comp: comp, target: cur } : null;
+}
+
+/** Values of references written in code, at the comp's current time. Null for any that don't resolve. */
 export const readReferences = (compId: number, layerId: number, paths: RefPath[]): (ValueReading | null)[] => {
   const home = compById(compId);
   const out: (ValueReading | null)[] = [];
   for (let i = 0; i < paths.length; i++) {
-    const path = paths[i] as RefPath;
     try {
-      let comp: CompItem = home;
-      if (path.comp) {
-        let found: CompItem | null = null;
-        for (let j = 1; j <= app.project.numItems && !found; j++) {
-          const item = app.project.item(j);
-          if (item instanceof CompItem && item.name === path.comp) found = item;
-        }
-        if (!found) {
-          out.push(null);
-          continue;
-        }
-        comp = found;
-      }
-      const l: any = path.layer;
-      let cur: any = l.self ? app.project.layerByID(layerId) : typeof l.index === "number" ? comp.layer(l.index) : comp.layer(l.name);
-      for (let s = 0; s < path.steps.length && cur; s++) {
-        const step: any = path.steps[s];
-        const options: string[] = step instanceof Array ? step : [step];
-        let next: any = null;
-        for (let k = 0; k < options.length && !next; k++) next = cur.property(options[k]);
-        cur = next;
-      }
-      out.push(cur && cur.propertyType === PropertyType.PROPERTY ? readAt(cur as Property, comp.time) : null);
+      const hit = follow(home, layerId, paths[i] as RefPath);
+      out.push(hit && hit.target.propertyType === PropertyType.PROPERTY ? readAt(hit.target as Property, hit.comp.time) : null);
     } catch (_e) {
       out.push(null);
     }
   }
   return out;
+};
+
+/** The tree key of what a reference points at (go to definition); null if it doesn't resolve. */
+export const resolveReferenceKey = (compId: number, layerId: number, path: RefPath): string | null => {
+  try {
+    const hit = follow(compById(compId), layerId, path);
+    return hit ? keyOf(hit.comp, hit.target) : null;
+  } catch (_e) {
+    return null;
+  }
 };
 
 /** How many properties findAllExpressions visits before giving up on a huge comp. */

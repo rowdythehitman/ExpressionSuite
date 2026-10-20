@@ -694,3 +694,32 @@ describe("snippets", () => {
     expect(useIde.getState().pendingInsert?.text).toBe('wiggle(effect("Frequency 2")("Slider"), effect("Amplitude 2")("Slider"))');
   });
 });
+
+describe("find references and go to definition", () => {
+  const SLIDER = "100:11:ADBE Effect Parade/ADBE Slider Control/ADBE Slider Control-0001";
+  beforeEach(async () => {
+    control.selectLayers([11, 13]);
+    await sync();
+    await useIde.getState().toggle("100:11:ADBE Effect Parade/ADBE Slider Control");
+  });
+
+  it("lists the expressions that use a property, by line", async () => {
+    await useIde.getState().findReferences(SLIDER);
+    const refs = useIde.getState().references!;
+    expect(refs.label).toBe("CTRLS › Speed › Slider");
+    expect(refs.results.map((r) => [r.key, r.line])).toEqual([[POSITION, 1]]);
+    // A layer's effect group: same reference.
+    await useIde.getState().findReferences("100:11:ADBE Effect Parade/ADBE Slider Control");
+    expect(useIde.getState().references!.results).toHaveLength(1);
+  });
+
+  it("goes to what a reference points at", async () => {
+    await useIde.getState().goToDefinition(POSITION, {
+      layer: { name: "CTRLS" },
+      steps: ["ADBE Effect Parade", "Speed", "Slider"],
+    });
+    expect(useIde.getState().selectedKey).toBe(SLIDER);
+    await useIde.getState().goToDefinition(POSITION, { layer: { name: "Nope" }, steps: ["ADBE Transform Group"] });
+    expect(useIde.getState().status?.text).toMatch(/doesn't point at anything/);
+  });
+});

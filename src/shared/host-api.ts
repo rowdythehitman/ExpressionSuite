@@ -18,6 +18,7 @@ export interface HostApi {
   getCompSchema(): CompSchema | null;
   getValueAtTime(key: string, time?: number): ValueReading;
   readReferences(compId: number, layerId: number, paths: RefPath[]): (ValueReading | null)[];
+  resolveReferenceKey(compId: number, layerId: number, path: RefPath): string | null;
   sampleValues(key: string, count: number): ValueSamples;
   addControl(layerId: number, matchName: string, name: string, value: number | number[]): string;
   addControls(layerId: number, items: { matchName: string; name: string; value: number | number[] }[], undoName: string): string[];

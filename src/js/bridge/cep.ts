@@ -41,6 +41,7 @@ export function createCepBridge(): Bridge {
     getCompSchema: () => call("getCompSchema"),
     findAllExpressions: () => call("findAllExpressions"),
     readReferences: (compId, layerId, paths) => call("readReferences", compId, layerId, paths),
+    resolveReferenceKey: (compId, layerId, path) => call("resolveReferenceKey", compId, layerId, path),
     sampleValues: (key, count) => call("sampleValues", key, count),
     addControl: (layerId, matchName, name, value) => call("addControl", layerId, matchName, name, value),
     addControls: (layerId, items, undoName) => call("addControls", layerId, items, undoName),

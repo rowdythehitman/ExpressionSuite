@@ -3,7 +3,7 @@
 import { parse } from "acorn";
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
 import type { MockComp, MockLayer, MockProp } from "./fixture";
-import { type ApplyResult, type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, type RefTarget, type TreeNode } from "./types";
+import { type ApplyResult, type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, type RefPath, type RefTarget, type TreeNode } from "./types";
 
 export interface MockControl {
   /** Select layers by id, as if clicked in the timeline. */
@@ -135,6 +135,27 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
     const { prop } = find(key);
     if (!prop || !isProperty(prop)) throw new BridgeError("NOT_FOUND", `Not a property: ${key}`);
     return prop;
+  }
+
+  /** Follows a code reference through the fixture, keeping the key segments on the way. */
+  function followPath(layerId: number, path: RefPath): { layer: MockLayer; prop: MockProp; segments: string[] } | null {
+    if (path.comp && path.comp !== comp.name) return null;
+    const l = path.layer as { self?: true; name?: string; index?: number };
+    const layer = l.self ? comp.layers.find((x) => x.id === layerId) : typeof l.index === "number" ? comp.layers[l.index - 1] : comp.layers.find((x) => x.name === l.name);
+    if (!layer) return null;
+    let children = layer.children;
+    let hit: MockProp | undefined;
+    const segments: string[] = [];
+    for (const step of path.steps) {
+      const options = Array.isArray(step) ? step : [step];
+      const i = children.findIndex((c) => options.includes(c.name) || options.includes(c.matchName));
+      hit = children[i];
+      if (!hit) return null;
+      const occurrence = children.slice(0, i + 1).filter((c) => c.matchName === hit!.matchName).length;
+      segments.push(segment(hit.matchName, occurrence));
+      children = hit.children ?? [];
+    }
+    return hit ? { layer, prop: hit, segments } : null;
   }
 
   function addEffect(layerId: number, matchName: string, name: string, value: unknown): string {
@@ -333,27 +354,19 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
       delay(
         () =>
           paths.map((path) => {
-            if (path.comp && path.comp !== comp.name) return null;
-            const l = path.layer as { self?: true; name?: string; index?: number };
-            const layer = l.self
-              ? comp.layers.find((x) => x.id === layerId)
-              : typeof l.index === "number"
-                ? comp.layers[l.index - 1]
-                : comp.layers.find((x) => x.name === l.name);
-            let children = layer?.children;
-            let hit: MockProp | undefined;
-            for (const step of path.steps) {
-              const options = Array.isArray(step) ? step : [step];
-              hit = children?.find((c) => options.includes(c.name) || options.includes(c.matchName));
-              if (!hit) return null;
-              children = hit.children;
-            }
-            if (!hit || !isProperty(hit)) return null;
-            const v = hit.value;
+            const hit = followPath(layerId, path);
+            if (!hit || !isProperty(hit.prop)) return null;
+            const v = hit.prop.value;
             return { time, value: typeof v === "number" || typeof v === "string" || Array.isArray(v) ? (v as number | number[] | string) : null };
           }),
         "readReferences",
       ),
+
+    resolveReferenceKey: (_compId, layerId, path) =>
+      delay(() => {
+        const hit = followPath(layerId, path);
+        return hit ? propKey(comp.id, hit.layer.id, hit.segments) : null;
+      }, "resolveReferenceKey"),
 
     findAllExpressions: () =>
       delay(() => {

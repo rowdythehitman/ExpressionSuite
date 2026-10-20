@@ -9,6 +9,7 @@ import { checkNames } from "./names";
 import { checkSyntax } from "./syntax";
 import { findControllable } from "../references/controls";
 import { declaredReferences } from "../references/resolve";
+import { chainAt } from "../references/usage";
 import { formatValue } from "./format";
 import { HistoryPanel } from "./HistoryPanel";
 import { SnippetsMenu } from "./SnippetsMenu";
@@ -338,6 +339,33 @@ function CodeEditor({ tab }: { tab: Tab }) {
     editor.addAction({ id: "expression-ide.make-control", label: "Make control on this layer", contextMenuGroupId: "1_modification", run: () => makeControl(false) });
     editor.addAction({ id: "expression-ide.make-control-pinned", label: "Make control on pinned layer", contextMenuGroupId: "1_modification", run: () => makeControl(true) });
 
+    // Go to definition: Ctrl/Cmd-click a reference, or F12 / the context menu with the cursor on one.
+    const goToDefinitionAt = (offset: number) => {
+      const model = editor.getModel();
+      const chain = model ? chainAt(model.getValue(), offset) : null;
+      if (!chain) {
+        useIde.getState().setStatus({ kind: "info", text: "Put the cursor on a reference such as thisComp.layer(\"…\").effect(\"…\")(\"…\")." });
+        return;
+      }
+      void useIde.getState().goToDefinition(keyRef.current, chain.path);
+    };
+    editor.onMouseDown((e) => {
+      const model = editor.getModel();
+      if (!model || !e.target.position || !wantsDeclaration(e.event)) return;
+      goToDefinitionAt(model.getOffsetAt(e.target.position));
+    });
+    editor.addAction({
+      id: "expression-ide.go-to-definition",
+      label: "Go to definition (reveal in explorer and timeline)",
+      keybindings: [monaco.KeyCode.F12],
+      contextMenuGroupId: "navigation",
+      run: () => {
+        const model = editor.getModel();
+        const pos = editor.getPosition();
+        if (model && pos) goToDefinitionAt(model.getOffsetAt(pos));
+      },
+    });
+
     // Pick from timeline: insert a reference to the property selected in AE (replaces Monaco's command palette key).
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, async () => {
       const ref = await useIde.getState().pickFromTimeline(keyRef.current);
@@ -405,6 +433,16 @@ function CodeEditor({ tab }: { tab: Tab }) {
     const model = monaco.editor.getModel(monaco.Uri.parse(modelPath(tab.key)));
     if (model && model.getValue() !== tab.code) model.setValue(tab.code);
   }, [tab.key, tab.code]);
+
+  // A cursor move waiting for this tab (opened from the references list).
+  const pendingCursor = useIde((s) => s.pendingCursor);
+  useEffect(() => {
+    if (!pendingCursor || pendingCursor.key !== tab.key || !editorInstance) return;
+    useIde.setState({ pendingCursor: null });
+    editorInstance.setPosition({ lineNumber: pendingCursor.line, column: 1 });
+    editorInstance.revealLineInCenter(pendingCursor.line);
+    editorInstance.focus();
+  }, [pendingCursor, tab.key, editorInstance]);
 
   // Snippet code waiting for this tab goes in at the cursor (the main editor takes it).
   const pending = useIde((s) => s.pendingInsert);
