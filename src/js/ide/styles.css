@@ -544,13 +544,14 @@ button {
 }
 
 .snippets-popover {
-  position: absolute;
-  z-index: 60;
-  top: 28px;
-  right: 0;
+  position: fixed;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
   width: 320px;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
   padding: 4px 0;
   background: var(--menu-bg);
   border: 1px solid var(--menu-border);
@@ -901,7 +902,7 @@ button {
 }
 
 .graph-toggle {
-  margin-left: auto;
+  flex: none;
   padding: 0 8px;
   font-family: var(--font-ui);
   color: var(--text-dim);

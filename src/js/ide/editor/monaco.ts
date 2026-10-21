@@ -30,6 +30,9 @@ monaco.typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
   noSyntaxValidation: true,
 });
+// Quick fixes are ours (setQuickFixes). TypeScript's ("ignore this error", …) don't apply to expressions, and its
+// slow worker held up Ctrl+. long enough for the cursor's auto request to cancel it: "No code actions available".
+monaco.typescript.javascriptDefaults.setModeConfiguration({ ...monaco.typescript.javascriptDefaults.modeConfiguration, codeActions: false });
 
 // AE's expression API as globals (thisComp, wiggle, loopOut, linear, …) for completions and hovers.
 monaco.typescript.javascriptDefaults.addExtraLib(buildAeLib(aeDts), "file:///typings/ae-expressions.d.ts");

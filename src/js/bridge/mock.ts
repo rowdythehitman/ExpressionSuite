@@ -2,6 +2,7 @@
 // It follows the host's rules: same keys, groups with nothing scriptable hidden, selected layers preloaded.
 import { parse } from "acorn";
 import { layerKey, parseKey, propKey, segment, parseSegment } from "../../shared/keys";
+import { canHoldEffects } from "../../shared/layers";
 import type { MockComp, MockLayer, MockProp } from "./fixture";
 import { type ApplyResult, type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, type RefPath, type RefTarget, type TreeNode } from "./types";
 
@@ -161,6 +162,7 @@ export function createMockBridge(initialComp: MockComp, opts: { latencyMs?: numb
   function addEffect(layerId: number, matchName: string, name: string, value: unknown): string {
     const layer = comp.layers.find((l) => l.id === layerId);
     if (!layer) throw new BridgeError("NOT_FOUND", "The layer no longer exists.");
+    if (!canHoldEffects(layer.matchName)) throw new BridgeError("NO_EFFECTS", `Layer "${layer.name}" can't hold effects (cameras and lights can't).`);
     let parade = layer.children.find((c) => c.matchName === "ADBE Effect Parade");
     if (!parade) {
       parade = { name: "Effects", matchName: "ADBE Effect Parade", children: [] };

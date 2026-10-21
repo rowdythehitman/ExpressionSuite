@@ -4,6 +4,7 @@ import type { RefPath, ValueSamples } from "../bridge";
 import { referenceChains, usesTarget } from "./references/usage";
 import { type Bridge, BridgeError, type CompSchema, type CompTree, type ExpressionScan, getBridge, type TreeNode, type ValueReading, type ValueType } from "../bridge";
 import { layerKey, parentKey, parseKey } from "../../shared/keys";
+import { canHoldEffects } from "../../shared/layers";
 import { parseAeError } from "./aeError";
 import { addEntry, loadHistory, saveHistory, type HistoryEntry, type HistorySource } from "./history";
 import type { Rgb } from "../bridge/panel";
@@ -438,13 +439,20 @@ export const useIde = create<IdeState>((set, get) => {
       set({ status: { kind: "info", text: "This tab's comp isn't the one shown in the explorer: open that comp, then try again." } });
       return null;
     }
-    const layer = onPinned
-      ? tree.layers.find((l) => state.pinned.includes(l.name))
-      : tree.layers.find((l) => l.key === layerKey(p.compId, p.layerId));
-    if (!layer) {
+    const pinnedLayer = tree.layers.find((l) => state.pinned.includes(l.name) && canHoldEffects(l.matchName));
+    const own = onPinned ? pinnedLayer : tree.layers.find((l) => l.key === layerKey(p.compId, p.layerId));
+    if (!own) {
       set({ status: { kind: "info", text: "No pinned layer in this comp: right-click a layer › Pin to top first." } });
       return null;
     }
+    // Cameras and lights have no Effects: their controls go on the pinned layer instead.
+    const movedFrom = canHoldEffects(own.matchName) ? null : own.name;
+    if (movedFrom && !pinnedLayer) {
+      const text = `“${movedFrom}” can't hold effects (cameras and lights can't). Pin a control layer (right-click a layer › Pin to top) and the control goes there.`;
+      set({ status: { kind: "info", text } });
+      return null;
+    }
+    const layer = movedFrom ? pinnedLayer! : own;
     const layerId = parseKey(layer.key)!.layerId;
     const taken = [...(state.schema?.layers.find((l) => l.id === layerId)?.effects.map((e) => e.name) ?? [])];
     const items = controls.map((c) => {
@@ -482,7 +490,7 @@ export const useIde = create<IdeState>((set, get) => {
     });
     // The tree and the comp names (completions, name check) pick up the new effects.
     const what = names.length === 1 ? `${CONTROL_SPECS[controls[0]!.kind].label} Control “${names[0]}”` : `${names.length} controls (${names.join(", ")})`;
-    set({ refreshNonce: get().refreshNonce + 1, status: { kind: "ok", text: `Added ${what} on ${layer.name}.` } });
+    set({ refreshNonce: get().refreshNonce + 1, status: { kind: "ok", text: `Added ${what} on ${layer.name}${movedFrom ? ` (${movedFrom} can't hold effects)` : ""}.` } });
     return refs;
   }
 

@@ -437,6 +437,47 @@ test("make a slider from a number in the code", async ({ page }) => {
   await expect(page.locator('.row:has-text("Wiggle Amplitude")')).toBeVisible();
 });
 
+test("Make control on a camera uses the pinned layer, or says why it can't", async ({ page }) => {
+  await page.getByLabel("Auto-apply").uncheck();
+  await page.getByRole("button", { name: "Comp", exact: true }).click();
+  await row(page, "100:15").click();
+  await row(page, "100:15:ADBE Transform Group").click();
+  await row(page, "100:15:ADBE Transform Group/ADBE Rotate X").dblclick();
+  await typeInEditor(page, "m = 55");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press(`${mod}+Alt+M`);
+  await expect(page.getByTestId("status-message")).toContainText("“Camera 1” can't hold effects");
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText("m = 55");
+
+  await row(page, "100:11").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Pin to top" }).click();
+  await page.locator(".monaco-editor .view-lines").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press(`${mod}+Alt+M`);
+  await expect(page.getByTestId("status-message")).toContainText("on CTRLS (Camera 1 can't hold effects).");
+  await expect(page.locator(".monaco-editor .view-lines")).toContainText('m = thisComp.layer("CTRLS").effect(');
+});
+
+test("the snippets list sits above the editor", async ({ page }) => {
+  await row(page, POSITION).dblclick();
+  await page.getByRole("button", { name: "Snippets ▾" }).click();
+  const item = page.getByRole("menuitem", { name: /Wiggle with sliders/ });
+  await expect(item).toBeVisible();
+  const box = (await item.boundingBox())!;
+  const onTop = await page.evaluate(
+    ([x, y]) => !!document.elementFromPoint(x!, y!)?.closest(".snippets-popover"),
+    [box.x + box.width / 2, box.y + box.height / 2],
+  );
+  expect(onTop).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(item).toBeHidden();
+});
+
 test("snippets insert code and create their controls", async ({ page }) => {
   await page.getByLabel("Auto-apply").uncheck();
   await row(page, POSITION).dblclick();
@@ -472,10 +513,8 @@ test("quick fix: a misspelt layer name", async ({ page }) => {
   await expect(page.locator(".monaco-editor .squiggly-warning")).not.toHaveCount(0);
   await page.keyboard.press("Home");
   for (let i = 0; i < 17; i++) await page.keyboard.press("ArrowRight"); // into "CTLRS"
-  await expect(async () => {
-    await page.keyboard.press("Control+Period");
-    await expect(page.getByText("Did you mean “CTRLS”?")).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
+  await page.keyboard.press("Control+Period"); // one press, straight after moving the cursor
+  await expect(page.getByText("Did you mean “CTRLS”?")).toBeVisible();
   await page.keyboard.press("Enter"); // the first (preferred) fix
   await expect(page.locator(".monaco-editor .view-lines")).toContainText('thisComp.layer("CTRLS").transform.scale');
 });

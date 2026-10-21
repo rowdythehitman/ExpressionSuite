@@ -656,14 +656,22 @@ export const sampleValues = (key: string, count: number): ValueSamples => {
   return { start: start, end: end, times: times, values: values };
 };
 
+/** A layer's Effects group. Cameras and lights have none. */
+const effectsOf = (layer: any): any => {
+  const parade = layer.property("ADBE Effect Parade");
+  if (!parade) fail("NO_EFFECTS", "Layer \"" + layer.name + "\" can't hold effects (cameras and lights can't).");
+  return parade;
+};
+
 /** Adds an expression control (Slider, Point, 3D Point, Checkbox) to a layer and sets its value, as one undo step.
  * Returns the effect's name as AE has it. */
 export const addControl = (layerId: number, matchName: string, name: string, value: number | number[]): string => {
   const layer: any = app.project.layerByID(layerId);
   if (!layer) fail("NOT_FOUND", "The layer no longer exists.");
+  const parade = effectsOf(layer);
   app.beginUndoGroup("Expression IDE: add " + name);
   try {
-    const fx = layer.property("ADBE Effect Parade").addProperty(matchName);
+    const fx = parade.addProperty(matchName);
     fx.name = name;
     fx.property(1).setValue(value);
     return fx.name;
@@ -676,12 +684,13 @@ export const addControl = (layerId: number, matchName: string, name: string, val
 export const addControls = (layerId: number, items: { matchName: string; name: string; value: number | number[] }[], undoName: string): string[] => {
   const layer: any = app.project.layerByID(layerId);
   if (!layer) fail("NOT_FOUND", "The layer no longer exists.");
+  const parade = effectsOf(layer);
   const names: string[] = [];
   app.beginUndoGroup(undoName);
   try {
     for (let i = 0; i < items.length; i++) {
       const item = items[i] as { matchName: string; name: string; value: number | number[] };
-      const fx = layer.property("ADBE Effect Parade").addProperty(item.matchName);
+      const fx = parade.addProperty(item.matchName);
       fx.name = item.name;
       fx.property(1).setValue(item.value);
       names.push(fx.name);

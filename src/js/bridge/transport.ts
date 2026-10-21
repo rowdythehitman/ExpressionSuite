@@ -24,7 +24,7 @@ export function hostCall(fn: string, args: unknown[]): string {
   );
 }
 
-const CODES: BridgeErrorCode[] = ["NO_COMP", "NOT_FOUND"];
+const CODES: BridgeErrorCode[] = ["NO_COMP", "NOT_FOUND", "NO_EFFECTS"];
 
 /** Turns a raw evalScript reply into data or a typed BridgeError. */
 export function parseReply(raw: string): unknown {

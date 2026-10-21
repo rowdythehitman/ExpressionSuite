@@ -66,6 +66,7 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
 - **Make control:** right-click a number, `[x, y]`, `[x, y, z]` or `true/false` in the code › *Make control on this
   layer* (`Ctrl+Alt+M` / `Cmd+Alt+M`) (or *on pinned layer*). It becomes a Slider, Point, 3D Point or Checkbox, named from where it sits
   (`const speed = 5` → Speed, `wiggle(2, 50)` → Wiggle Amplitude), set to that value, and the code now references it.
+  Cameras and lights can't hold effects, so their controls go on the pinned layer.
 - **Snippets ▾** (tab bar): wiggle with sliders, inertial bounce, posterize time, text box (`sourceRectAtTime`),
   loops. Inserting one creates the controls it uses and wires them in.
 - **Inline values:** `const x = <reference>;` lines show the reference's current value (`// = 2.5`).

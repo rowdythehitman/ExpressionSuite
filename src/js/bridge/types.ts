@@ -41,7 +41,7 @@ export interface Bridge {
   findAllExpressions(): Promise<ExpressionScan | null>;
 }
 
-export type BridgeErrorCode = "NO_COMP" | "NOT_FOUND" | "HOST" | "TRANSPORT";
+export type BridgeErrorCode = "NO_COMP" | "NOT_FOUND" | "NO_EFFECTS" | "HOST" | "TRANSPORT";
 
 export class BridgeError extends Error {
   readonly code: BridgeErrorCode;

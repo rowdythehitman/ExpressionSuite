@@ -211,3 +211,11 @@ showed a better way. Newest at the bottom.
     Monaco re-run `updateOptions`, which could close an open context menu mid-click; `syncTabs` also skips its store
     update when nothing changed, so the panel doesn't re-render every second. *Make control* has a shortcut
     (`Ctrl/Cmd+Alt+M`) and reports why it did nothing instead of failing silently.
+61. **Cameras and lights can't hold effects**, so *Make control* and snippets put their controls on the pinned layer
+    for those, and say so; with no pinned layer they explain why nothing happened. The host checks too
+    (`NO_EFFECTS`), since AE returns null for a camera's Effects group.
+62. **The Snippets list is portalled to `<body>`** with fixed positioning: inside the tab bar it was clipped and sat
+    behind Monaco. The value graph's toggle sits right after the value instead of at the far right.
+63. **TypeScript's own code actions are off** (`setModeConfiguration`). Its worker was slow enough that the
+    cursor's automatic code-action request, 250 ms after moving, cancelled a Ctrl+. press: "No code actions
+    available". The quick fixes are all ours anyway.
