@@ -240,14 +240,20 @@ describe("auto-apply", () => {
     expect(control.undoGroups()).toEqual(["Expression IDE: Scale"]);
   });
 
-  it("never auto-applies a syntax error or an emptied field", async () => {
+  it("never auto-applies a syntax error", async () => {
     const ide = useIde.getState();
     ide.updateCode(SCALE, "[50, ");
     await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
-    ide.updateCode(SCALE, "  ");
-    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
     expect(control.undoGroups()).toEqual([]);
     expect(canAutoApply({ ...useIde.getState().tabs[0]!, code: "[1, 2]" })).toBe(true);
+  });
+
+  it("auto-removes the expression when the field is emptied", async () => {
+    const ide = useIde.getState();
+    ide.updateCode(SCALE, "  ");
+    await vi.advanceTimersByTimeAsync(AUTO_APPLY_MS * 2);
+    expect(control.undoGroups()).toEqual(["Expression IDE: Scale"]);
+    expect(useIde.getState().status?.text).toBe("Auto-removed expression: Title_Text › Scale");
   });
 
   it("does nothing when switched off, and an explicit apply cancels the pending one", async () => {

@@ -32,7 +32,8 @@ Targets **After Effects 2025 (25.0) and later** (CEP 12).
   automatically.
 
 - **Auto-apply** (toggle in the tab bar, on by default): 1 s after you stop typing, a changed tab whose code has no
-  syntax error is applied, just like Ctrl+S. Syntax errors squiggle as you type.
+  syntax error is applied, just like Ctrl+S. Clearing the editor removes the expression the same way. Syntax
+  errors squiggle as you type.
 - **References:** drag any row from the explorer into the code to insert a reference such as
   `thisComp.layer("CTRLS").effect("Speed")("Slider")`. Hold **Ctrl** (Cmd on Mac) while dropping to declare it
   as a const named after the layer and property (`const ctrlsSpeed = …;`, `titleTextPosition`) and use it where you

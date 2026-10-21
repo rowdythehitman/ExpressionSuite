@@ -86,7 +86,7 @@ showed a better way. Newest at the bottom.
 
 26. **Auto-apply** (the spec's "Apply on pause") is **on by default**, as asked after the first AE run, with a tab-bar
     toggle remembered per machine. It fires 1 s after the last keystroke, only for a changed, non-empty tab that acorn
-    parses. Emptying a field never auto-removes an expression; Ctrl+S still can. Each auto-apply is its own undo step.
+    parses. Each auto-apply is its own undo step.
 27. **One source of syntax errors:** acorn (`ecmaVersion: "latest"`, top-level `return` allowed), checked 200 ms after
     typing stops. Monaco's TypeScript syntax diagnostics are off so errors aren't reported twice. The same check gates
     auto-apply.
@@ -219,3 +219,6 @@ showed a better way. Newest at the bottom.
 63. **TypeScript's own code actions are off** (`setModeConfiguration`). Its worker was slow enough that the
     cursor's automatic code-action request, 250 ms after moving, cancelled a Ctrl+. press: "No code actions
     available". The quick fixes are all ours anyway.
+64. **Clearing the editor auto-applies too** (revises 26): an empty (or whitespace-only) tab removes the
+    expression once typing pauses for 1 s. Replacing everything (select all, type) never sits empty that long, and
+    the old code is in local history and AE's undo.

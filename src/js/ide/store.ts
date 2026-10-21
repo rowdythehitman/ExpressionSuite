@@ -213,14 +213,13 @@ export function namesContext(schema: CompSchema | null, key: string): [CompSchem
   return schema && p && schema.compId === p.compId ? [schema, p.layerId] : [null, null];
 }
 
-/** Auto-apply is "safe" when the code changed, isn't empty (clearing a field mid-edit mustn't remove the
- * expression; Ctrl+S still can), parses, and every literal layer/effect/parameter name it uses exists. */
+/** Auto-apply is "safe" when the code changed, parses, and every literal layer/effect/parameter name it uses
+ * exists. An empty editor counts: clearing it removes the expression, once typing pauses. */
 export function canAutoApply(tab: Tab, schema: CompSchema | null = null): boolean {
   return (
     isDirty(tab) &&
     tab.external === undefined && // never silently overwrite a change made in AE
 
-    tab.code.trim() !== "" &&
     checkSyntax(tab.code) === null &&
     checkNames(tab.code, ...namesContext(schema, tab.key)).length === 0
   );
@@ -982,7 +981,8 @@ export const useIde = create<IdeState>((set, get) => {
       const code = tab.code;
       const label = `${tab.layerName} › ${tab.propName}`;
       try {
-        const res = await bridge().setExpression(key, code);
+        // Only whitespace left: remove the expression rather than set a blank one.
+        const res = await bridge().setExpression(key, code.trim() === "" ? "" : code);
         record(key, tab.original, code, fromFile ? "file" : auto ? "auto" : "apply");
         set({
           tabs: get().tabs.map((t) => (t.key === key ? { ...t, original: code, error: res.error, external: undefined } : t)),
@@ -991,7 +991,7 @@ export const useIde = create<IdeState>((set, get) => {
             ? { kind: "error", text: `${label}: ${parseAeError(res.error).summary}`, detail: res.error }
             : {
                 kind: "ok",
-                text: code === "" ? `Removed expression: ${label}` : `${fromFile ? "Applied from file" : auto ? "Auto-applied" : "Applied"}: ${label}`,
+                text: code.trim() === "" ? `${auto ? "Auto-removed" : "Removed"} expression: ${label}` : `${fromFile ? "Applied from file" : auto ? "Auto-applied" : "Applied"}: ${label}`,
               },
         });
         // Keep a linked file in step with what's in AE.

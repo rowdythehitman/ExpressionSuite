@@ -87,6 +87,15 @@ test("reset closes tabs and reloads; messages can be dismissed", async ({ page }
   await expect(page.getByTestId("status-message")).toHaveCount(0);
 });
 
+test("auto-apply: clearing the editor removes the expression", async ({ page }) => {
+  await expect(row(page, POSITION)).toContainText("{ }");
+  await row(page, POSITION).dblclick();
+  await typeInEditor(page, "  ");
+  await expect(page.getByTestId("status-message")).toHaveText("Auto-removed expression: Title_Text › Position", { timeout: 3000 });
+  expect(await page.evaluate((k) => window.__mockAE!.getExpression(k), POSITION)).toBe("");
+  await expect(row(page, POSITION)).not.toContainText("{ }");
+});
+
 test("auto-apply: valid code applies after a pause; a syntax error squiggles and waits", async ({ page }) => {
   const scale = "100:13:ADBE Transform Group/ADBE Scale";
   await expect(page.getByLabel("Auto-apply")).toBeChecked();
